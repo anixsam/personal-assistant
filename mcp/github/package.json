@@ -1,0 +1,8 @@
+{
+  "name": "@jarvis/mcp-github",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "jarvis-mcp-github": "dist/index.js" },
+  "scripts": { "build": "tsc -p .", "typecheck": "tsc -p . --noEmit" }
+}

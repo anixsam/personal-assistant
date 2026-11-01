@@ -1,0 +1,8 @@
+{
+  "name": "@jarvis/mcp-claude-code",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "jarvis-mcp-claude-code": "dist/index.js" },
+  "scripts": { "build": "tsc -p .", "typecheck": "tsc -p . --noEmit" }
+}
