@@ -8,7 +8,7 @@ export interface NimConfig {
 
 export const NIM_DEFAULTS = {
   baseUrl: "https://integrate.api.nvidia.com/v1",
-  model: "nvidia/nemotron-3-super-120b-a12b",
+  model: "nvidia/nemotron-3.5-super-vl-120b-a12b",
   timeoutMs: 60_000,
 } as const;
 
