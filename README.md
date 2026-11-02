@@ -21,8 +21,11 @@ to Claude or Claude Code only after you approve.
 
 ```bash
 pnpm install
-cp .env.example .env   # fill in keys
-pnpm dev
+cp .env.example .env   # add NVIDIA_API_KEY (and optionally ANTHROPIC_API_KEY, CLAUDE_CODE_CWD)
+pnpm -r build
+pnpm dev               # server on :8787, chat UI on http://localhost:3000
 ```
+
+Needs Node 22+ and pnpm.
 
 Progress is tracked in [ROADMAP.md](ROADMAP.md).
