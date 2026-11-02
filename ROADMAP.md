@@ -15,8 +15,9 @@ same commit that completes the task.
 - [ ] 10. Wire the MCP servers into the tool loop, plus a `.mcp.json` for using them from Claude Code directly
 - [ ] 11. `packages/voice`: Piper TTS wrapper using a British male voice (`en_GB-alan-medium`), with a voice-download script
 - [ ] 12. Voice replies in the UI: speak assistant responses, mute toggle, playback controls
-- [ ] 13. Persistence: SQLite store for conversations and dashboard metrics
-- [ ] 14. Dev experience: root `pnpm dev`, CI (typecheck + build), setup docs
+- [ ] 13. Voice input (speech recognition): push-to-talk mic button in the UI, speech-to-text via NVIDIA NIM ASR (Parakeet) with local whisper.cpp as offline fallback, transcript sent as a chat message
+- [ ] 14. Persistence: SQLite store for conversations and dashboard metrics
+- [ ] 15. Dev experience: root `pnpm dev`, CI (typecheck + build), setup docs
 
 ## Routing
 
