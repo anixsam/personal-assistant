@@ -4,7 +4,7 @@ One task is completed per scheduled build run (every 6 hours). Tick the box in t
 same commit that completes the task.
 
 - [x] 1. Monorepo scaffold: pnpm workspaces, shared TS config, package layout, roadmap
-- [ ] 2. `packages/router`: NVIDIA NIM client (OpenAI-compatible API, `NVIDIA_API_KEY`). Every request goes to NIM first; NIM answers or decides to delegate
+- [x] 2. `packages/router`: NVIDIA NIM client (OpenAI-compatible API, `NVIDIA_API_KEY`). Every request goes to NIM first; NIM answers or decides to delegate
 - [ ] 3. `apps/server`: Node/TypeScript API with a streaming chat endpoint that routes through the NIM router
 - [ ] 4. Delegation layer: NIM hands off to Claude (Anthropic API) or the Claude Code agent only after the user approves the handoff in the UI
 - [ ] 5. `apps/web`: Next.js + Tailwind + shadcn/ui chat UI (conversation list, streaming messages, markdown/code rendering, handoff approval prompts)
