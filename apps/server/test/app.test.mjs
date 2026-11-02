@@ -38,17 +38,56 @@ test("router failure becomes 502", async () => {
   assert.equal((await res.json()).error, "NIM down");
 });
 
-test("handoff is created pending and must be approved once", async () => {
-  const app = createApp({ router: handoffRouter });
+const tick = () => new Promise((r) => setTimeout(r, 10));
+
+test("handoff is created pending, approval runs the delegate once", async () => {
+  const calls = [];
+  const delegates = { "claude-code": { run: async (h) => { calls.push(h.task); return { output: "Fixed it.", by: "claude-code", costUsd: 0.12 }; } } };
+  const app = createApp({ router: handoffRouter, delegates });
   const body = await (await post(app, "/api/chat", user)).json();
   assert.equal(body.kind, "handoff");
   assert.equal(body.handoff.status, "pending");
+  assert.equal(calls.length, 0, "nothing runs before approval");
   const pending = await (await app.request("/api/handoffs?status=pending")).json();
   assert.equal(pending.handoffs.length, 1);
   const ok = await post(app, `/api/handoffs/${body.handoff.id}/approve`, {});
-  assert.equal((await ok.json()).handoff.status, "approved");
+  assert.equal(ok.status, 202);
+  assert.equal((await ok.json()).handoff.status, "running");
+  await tick();
+  const done = (await (await app.request(`/api/handoffs/${body.handoff.id}`)).json()).handoff;
+  assert.equal(done.status, "completed");
+  assert.equal(done.result, "Fixed it.");
+  assert.deepEqual(calls, ["Fix the login bug"]);
+  assert.equal((await post(app, `/api/handoffs/${body.handoff.id}/approve`, {})).status, 409);
   assert.equal((await post(app, `/api/handoffs/${body.handoff.id}/reject`, {})).status, 409);
   assert.equal((await post(app, "/api/handoffs/nope/approve", {})).status, 404);
+});
+
+test("delegate failure marks the handoff failed", async () => {
+  const delegates = { "claude-code": { run: async () => { throw new Error("tests failed"); } } };
+  const app = createApp({ router: handoffRouter, delegates });
+  const { handoff } = await (await post(app, "/api/chat", user)).json();
+  await post(app, `/api/handoffs/${handoff.id}/approve`, {});
+  await tick();
+  const h = (await (await app.request(`/api/handoffs/${handoff.id}`)).json()).handoff;
+  assert.equal(h.status, "failed");
+  assert.equal(h.error, "tests failed");
+});
+
+test("approving without a configured delegate is 503 and stays pending", async () => {
+  const app = createApp({ router: handoffRouter });
+  const { handoff } = await (await post(app, "/api/chat", user)).json();
+  assert.equal((await post(app, `/api/handoffs/${handoff.id}/approve`, {})).status, 503);
+  assert.equal((await (await app.request(`/api/handoffs/${handoff.id}`)).json()).handoff.status, "pending");
+});
+
+test("rejecting never runs the delegate", async () => {
+  let ran = false;
+  const app = createApp({ router: handoffRouter, delegates: { "claude-code": { run: async () => { ran = true; return { output: "", by: "x" }; } } } });
+  const { handoff } = await (await post(app, "/api/chat", user)).json();
+  assert.equal((await (await post(app, `/api/handoffs/${handoff.id}/reject`, {})).json()).handoff.status, "rejected");
+  await tick();
+  assert.equal(ran, false);
 });
 
 test("SSE stream sends route, deltas and done", async () => {

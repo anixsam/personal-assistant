@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DelegateTarget } from "@jarvis/router";
 
-export type HandoffStatus = "pending" | "approved" | "rejected";
+export type HandoffStatus = "pending" | "approved" | "rejected" | "running" | "completed" | "failed";
 
 export interface Handoff {
   id: string;
@@ -11,11 +11,19 @@ export interface Handoff {
   status: HandoffStatus;
   createdAt: string;
   decidedAt?: string;
+  finishedAt?: string;
+  /** Output from Claude / Claude Code once completed. */
+  result?: string;
+  /** Model or agent that produced the result. */
+  by?: string;
+  costUsd?: number;
+  error?: string;
 }
 
+export const HANDOFF_STATUSES: readonly HandoffStatus[] = ["pending", "approved", "rejected", "running", "completed", "failed"];
+
 /**
- * Handoffs NIM has proposed. Nothing is sent to Claude or Claude Code until a handoff is
- * approved; running approved handoffs is added in the delegation step of the roadmap.
+ * Handoffs NIM has proposed. Nothing is sent to Claude or Claude Code until a handoff is approved.
  * In-memory for now; SQLite persistence comes later.
  */
 export class HandoffStore {
@@ -42,6 +50,12 @@ export class HandoffStore {
     if (h.status !== "pending") return null;
     h.status = status;
     h.decidedAt = new Date().toISOString();
+    return h;
+  }
+
+  update(id: string, patch: Partial<Omit<Handoff, "id">>): Handoff | undefined {
+    const h = this.items.get(id);
+    if (h) Object.assign(h, patch);
     return h;
   }
 }

@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import type { NimMessage, RouteResult } from "@jarvis/router";
-import { HandoffStore, type Handoff } from "./handoffs.js";
+import { HandoffStore, HANDOFF_STATUSES, type Handoff } from "./handoffs.js";
+import type { Delegates } from "./delegates/types.js";
 
 /** The part of JarvisRouter the server needs (lets tests pass a fake). */
 export interface ChatRouter {
@@ -12,6 +13,8 @@ export interface ChatRouter {
 export interface AppDeps {
   router: ChatRouter;
   handoffs?: HandoffStore;
+  /** Executors for approved handoffs. A missing target makes approval fail with 503. */
+  delegates?: Delegates;
   corsOrigin?: string;
 }
 
@@ -39,7 +42,7 @@ export function parseMessages(body: unknown): NimMessage[] | string {
   return out;
 }
 
-export function createApp({ router, handoffs = new HandoffStore(), corsOrigin = "*" }: AppDeps) {
+export function createApp({ router, handoffs = new HandoffStore(), delegates = {}, corsOrigin = "*" }: AppDeps) {
   const app = new Hono();
   app.use("/api/*", cors({ origin: corsOrigin }));
 
@@ -88,18 +91,38 @@ export function createApp({ router, handoffs = new HandoffStore(), corsOrigin = 
 
   app.get("/api/handoffs", (c) => {
     const status = c.req.query("status");
-    if (status && !["pending", "approved", "rejected"].includes(status)) return c.json({ error: "bad status" }, 400);
+    if (status && !HANDOFF_STATUSES.includes(status as Handoff["status"])) return c.json({ error: "bad status" }, 400);
     return c.json({ handoffs: handoffs.list(status as Handoff["status"] | undefined) });
   });
 
-  for (const [action, status] of [["approve", "approved"], ["reject", "rejected"]] as const) {
-    app.post(`/api/handoffs/:id/${action}`, (c) => {
-      const h = handoffs.decide(c.req.param("id"), status);
-      if (h === undefined) return c.json({ error: "handoff not found" }, 404);
-      if (h === null) return c.json({ error: "handoff was already decided" }, 409);
-      return c.json({ handoff: h });
-    });
-  }
+  app.get("/api/handoffs/:id", (c) => {
+    const h = handoffs.get(c.req.param("id"));
+    return h ? c.json({ handoff: h }) : c.json({ error: "handoff not found" }, 404);
+  });
+
+  /** Approving starts the handoff in the background; poll GET /api/handoffs/:id for the result. */
+  app.post("/api/handoffs/:id/approve", (c) => {
+    const id = c.req.param("id");
+    const existing = handoffs.get(id);
+    if (!existing) return c.json({ error: "handoff not found" }, 404);
+    const delegate = delegates[existing.target];
+    if (!delegate) return c.json({ error: `${existing.target} is not configured on this server` }, 503);
+    const h = handoffs.decide(id, "approved");
+    if (!h) return c.json({ error: "handoff was already decided" }, 409);
+    handoffs.update(id, { status: "running" });
+    void delegate
+      .run(h)
+      .then((r) => handoffs.update(id, { status: "completed", result: r.output, by: r.by, costUsd: r.costUsd, finishedAt: new Date().toISOString() }))
+      .catch((err) => handoffs.update(id, { status: "failed", error: errorMessage(err), finishedAt: new Date().toISOString() }));
+    return c.json({ handoff: handoffs.get(id) }, 202);
+  });
+
+  app.post("/api/handoffs/:id/reject", (c) => {
+    const h = handoffs.decide(c.req.param("id"), "rejected");
+    if (h === undefined) return c.json({ error: "handoff not found" }, 404);
+    if (h === null) return c.json({ error: "handoff was already decided" }, 409);
+    return c.json({ handoff: h });
+  });
 
   return app;
 }
