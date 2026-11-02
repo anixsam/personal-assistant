@@ -16,7 +16,7 @@ test("loadNimConfig requires a key and applies defaults", () => {
   const c = loadNimConfig({ NVIDIA_API_KEY: " abc ", NIM_BASE_URL: "https://x/v1/" });
   assert.equal(c.apiKey, "abc");
   assert.equal(c.baseUrl, "https://x/v1");
-  assert.equal(c.model, "meta/llama-3.3-70b-instruct");
+  assert.equal(c.model, "nvidia/nemotron-3-super-120b-a12b");
 });
 
 test("router returns NIM's direct answer and sends system prompt + tool", async () => {
