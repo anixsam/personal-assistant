@@ -16,8 +16,9 @@ same commit that completes the task.
 - [ ] 11. `packages/voice`: Piper TTS wrapper using a British male voice (`en_GB-alan-medium`), with a voice-download script
 - [ ] 12. Voice replies in the UI: speak assistant responses, mute toggle, playback controls
 - [ ] 13. Voice input (speech recognition): push-to-talk mic button in the UI, speech-to-text via NVIDIA NIM ASR (Parakeet) with local whisper.cpp as offline fallback, transcript sent as a chat message
-- [ ] 14. Persistence: SQLite store for conversations and dashboard metrics
-- [ ] 15. Dev experience: root `pnpm dev`, CI (typecheck + build), setup docs
+- [ ] 14. Voice identification: enroll the owner's voice (a few short phrases), compute a speaker embedding locally (ECAPA-TDNN via ONNX), and check every spoken request against it; unrecognized voices get "Access denied" and are logged on the dashboard. Adjustable match threshold, re-enroll option, and a PIN fallback
+- [ ] 15. Persistence: SQLite store for conversations and dashboard metrics
+- [ ] 16. Dev experience: root `pnpm dev`, CI (typecheck + build), setup docs
 
 ## Routing
 
