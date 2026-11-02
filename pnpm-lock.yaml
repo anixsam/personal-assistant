@@ -12,7 +12,21 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
-  apps/server: {}
+  apps/server:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.17
+        version: 1.19.17(hono@4.13.16)
+      '@jarvis/router':
+        specifier: workspace:*
+        version: link:../../packages/router
+      hono:
+        specifier: ^4.13.16
+        version: 4.13.16
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
 
   apps/web: {}
 
@@ -34,8 +48,18 @@ importers:
 
 packages:
 
+  '@hono/node-server@1.19.17':
+    resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: ^4
+
   '@types/node@22.20.5':
     resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
+
+  hono@4.13.16:
+    resolution: {integrity: sha512-AOLOEhvrV+iH92xXCnFr/5+3KjPKcI3xP63XJtX5spAnkznPdHijlIsUTpi7/9EhWqrTCekw5c5zh1K+YsVw7A==}
+    engines: {node: '>=16.9.0'}
 
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
@@ -47,9 +71,15 @@ packages:
 
 snapshots:
 
+  '@hono/node-server@1.19.17(hono@4.13.16)':
+    dependencies:
+      hono: 4.13.16
+
   '@types/node@22.20.5':
     dependencies:
       undici-types: 6.21.0
+
+  hono@4.13.16: {}
 
   typescript@5.9.3: {}
 
