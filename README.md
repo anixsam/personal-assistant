@@ -26,6 +26,6 @@ pnpm -r build
 pnpm dev               # server on :8787, chat UI on http://localhost:3000
 ```
 
-Needs Node 22+ and pnpm.
+Needs Node 22+ and pnpm 10 (`npm i -g pnpm@10.28.0`; on Windows, pnpm 11+ can fail to switch to the pinned version).
 
 Progress is tracked in [ROADMAP.md](ROADMAP.md).

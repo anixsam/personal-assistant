@@ -26,6 +26,8 @@ export class ClaudeCodeDelegate implements Delegate {
         stdio: ["ignore", "pipe", "pipe"],
         signal,
         timeout: this.opts.timeoutMs ?? 30 * 60_000,
+        // On Windows the claude CLI is a .cmd shim, which needs a shell to start.
+        shell: process.platform === "win32",
       });
       let stdout = "";
       let stderr = "";

@@ -76,7 +76,13 @@ export class NimClient {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new NimError(`NIM request failed with ${res.status}`, res.status, text.slice(0, 2000));
+      const hint =
+        res.status === 401 || res.status === 403
+          ? " (check NVIDIA_API_KEY)"
+          : res.status === 404 || res.status === 410
+            ? ` (model "${this.config.model}" isn't available on NIM any more; set NIM_MODEL to a current model)`
+            : "";
+      throw new NimError(`NIM request failed with ${res.status}${hint}`, res.status, text.slice(0, 2000));
     }
     return res;
   }

@@ -57,3 +57,8 @@ test("chatStream yields SSE content deltas", async () => {
   for await (const d of nim.chatStream([{ role: "user", content: "x" }])) out += d;
   assert.equal(out, "Hello");
 });
+
+test("retired model errors explain the fix", async () => {
+  const nim = new NimClient(config, async () => new Response("gone", { status: 410 }));
+  await assert.rejects(nim.chat([{ role: "user", content: "x" }]), /isn't available on NIM any more; set NIM_MODEL/);
+});
