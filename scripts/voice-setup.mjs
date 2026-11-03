@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Downloads the Piper text-to-speech engine and Jarvis's stock British voice (en_GB-alan-medium)
 // into ./voices. Run once: pnpm voice:setup
+// Extra stock voices: pnpm voice:setup en_GB-northern_english_male-medium en_GB-cori-high
 import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { Readable } from "node:stream";
@@ -10,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dir = path.join(root, "voices");
-const voice = process.env.PIPER_VOICE || "en_GB-alan-medium";
+const voices = process.argv.slice(2).length ? process.argv.slice(2) : [process.env.PIPER_VOICE || "en_GB-alan-medium"];
 const PIPER = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/";
 const archives = {
   "win32-x64": "piper_windows_amd64.zip",
@@ -49,12 +50,14 @@ if (existsSync(exe)) {
   if (!existsSync(exe)) throw new Error(`Extracted archive but ${exe} is missing`);
 }
 
-// 2. Voice model + config (stock Piper voice from rhasspy/piper-voices)
-const [lang, region_name, quality] = [voice.split("_")[0], voice.split("-")[0], voice.split("-").pop()];
-const speaker = voice.split("-")[1];
-const base = `https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/${lang}/${region_name}/${speaker}/${quality}/${voice}`;
-console.log(`Voice ${voice}:`);
-await download(`${base}.onnx`, path.join(dir, `${voice}.onnx`));
-await download(`${base}.onnx.json`, path.join(dir, `${voice}.onnx.json`));
+// 2. Voice models + configs (stock Piper voices from rhasspy/piper-voices)
+for (const voice of voices) {
+  const [lang, regionName, quality] = [voice.split("_")[0], voice.split("-")[0], voice.split("-").pop()];
+  const speaker = voice.split("-")[1];
+  const base = `https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/${lang}/${regionName}/${speaker}/${quality}/${voice}`;
+  console.log(`Voice ${voice}:`);
+  await download(`${base}.onnx`, path.join(dir, `${voice}.onnx`));
+  await download(`${base}.onnx.json`, path.join(dir, `${voice}.onnx.json`));
+}
 
-console.log(`\nDone. Voice files are in ${dir}. Restart Jarvis (pnpm dev) to enable spoken replies.`);
+console.log(`\nDone. Voice files are in ${dir}. Set PIPER_VOICE in .env to pick one, then restart Jarvis (pnpm dev).`);
