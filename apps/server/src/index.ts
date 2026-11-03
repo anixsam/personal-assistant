@@ -38,7 +38,7 @@ if (env.CLAUDE_CODE_CWD) {
 
 // Voice: files from `pnpm voice:setup` live in <repo>/voices. PIPER_BIN / PIPER_MODEL override them.
 const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
-const voiceName = env.PIPER_VOICE || "en_GB-alan-medium";
+const voiceName = env.PIPER_VOICE || "en_GB-northern_english_male-medium";
 const defaults = defaultVoicePaths(repoRoot, voiceName);
 const piperBin = env.PIPER_BIN && isAbsolute(env.PIPER_BIN) && existsSync(env.PIPER_BIN) ? env.PIPER_BIN : existsSync(defaults.bin) ? defaults.bin : env.PIPER_BIN || defaults.bin;
 const piper = new PiperVoice({ bin: piperBin, model: env.PIPER_MODEL || defaults.model, lengthScale: Number(env.PIPER_LENGTH_SCALE) || undefined });

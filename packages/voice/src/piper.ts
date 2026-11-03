@@ -68,7 +68,7 @@ export class PiperVoice {
 }
 
 /** Default locations used by `pnpm voice:setup` (relative to the repo root). */
-export function defaultVoicePaths(repoRoot: string, voice = "en_GB-alan-medium") {
+export function defaultVoicePaths(repoRoot: string, voice = "en_GB-northern_english_male-medium") {
   const exe = process.platform === "win32" ? "piper.exe" : "piper";
   return { bin: path.join(repoRoot, "voices", "piper", exe), model: path.join(repoRoot, "voices", `${voice}.onnx`) };
 }

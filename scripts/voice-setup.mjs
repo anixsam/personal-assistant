@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Downloads the Piper text-to-speech engine and Jarvis's stock British voice (en_GB-alan-medium)
+// Downloads the Piper text-to-speech engine and Jarvis's stock British voice (en_GB-northern_english_male-medium)
 // into ./voices. Run once: pnpm voice:setup
 // Extra stock voices: pnpm voice:setup en_GB-northern_english_male-medium en_GB-cori-high
 import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dir = path.join(root, "voices");
-const voices = process.argv.slice(2).length ? process.argv.slice(2) : [process.env.PIPER_VOICE || "en_GB-alan-medium"];
+const voices = process.argv.slice(2).length ? process.argv.slice(2) : [process.env.PIPER_VOICE || "en_GB-northern_english_male-medium"];
 const PIPER = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/";
 const archives = {
   "win32-x64": "piper_windows_amd64.zip",
