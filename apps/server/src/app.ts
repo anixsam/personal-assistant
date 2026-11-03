@@ -4,6 +4,7 @@ import { streamSSE } from "hono/streaming";
 import type { NimMessage, RouteResult } from "@jarvis/router";
 import { HandoffStore, HANDOFF_STATUSES, type Handoff } from "./handoffs.js";
 import type { Delegates } from "./delegates/types.js";
+import { StatsStore, defaultMcpStatus, type McpStatus } from "./stats.js";
 
 /** The part of JarvisRouter the server needs (lets tests pass a fake). */
 export interface ChatRouter {
@@ -15,6 +16,9 @@ export interface AppDeps {
   handoffs?: HandoffStore;
   /** Executors for approved handoffs. A missing target makes approval fail with 503. */
   delegates?: Delegates;
+  stats?: StatsStore;
+  /** Reports MCP server health for the dashboard. */
+  mcpStatus?: () => McpStatus[] | Promise<McpStatus[]>;
   corsOrigin?: string;
 }
 
@@ -42,18 +46,46 @@ export function parseMessages(body: unknown): NimMessage[] | string {
   return out;
 }
 
-export function createApp({ router, handoffs = new HandoffStore(), delegates = {}, corsOrigin = "*" }: AppDeps) {
+export function createApp({
+  router,
+  handoffs = new HandoffStore(),
+  delegates = {},
+  stats = new StatsStore(),
+  mcpStatus = defaultMcpStatus,
+  corsOrigin = "*",
+}: AppDeps) {
   const app = new Hono();
   app.use("/api/*", cors({ origin: corsOrigin }));
 
   async function reply(messages: NimMessage[], signal?: AbortSignal): Promise<ChatReply> {
-    const result = await router.route(messages, signal);
+    const started = Date.now();
+    let result: RouteResult;
+    try {
+      result = await router.route(messages, signal);
+    } catch (err) {
+      stats.record({ at: started, model: "unknown", kind: "answer", latencyMs: Date.now() - started, tokens: 0, ok: false });
+      throw err;
+    }
+    stats.record({
+      at: started,
+      model: result.model,
+      kind: result.kind === "answer" ? "answer" : "handoff",
+      latencyMs: Date.now() - started,
+      tokens: result.usage?.total_tokens ?? 0,
+      ok: true,
+    });
     if (result.kind === "answer") return { kind: "answer", content: result.content, model: result.model };
     const handoff = handoffs.create({ target: result.target, task: result.task, reason: result.reason });
     return { kind: "handoff", handoff, model: result.model };
   }
 
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  /** Dashboard numbers: usage per model, hourly traffic, handoff history, MCP health. */
+  app.get("/api/stats", async (c) => {
+    const hours = Math.min(Math.max(Number(c.req.query("hours")) || 24, 1), 168);
+    return c.json(stats.snapshot(handoffs, await mcpStatus(), Date.now(), hours));
+  });
 
   /** Non-streaming chat: returns NIM's answer or a pending handoff. */
   app.post("/api/chat", async (c) => {

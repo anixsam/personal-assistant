@@ -13,7 +13,9 @@ export function useConversations() {
   useEffect(() => {
     const stored = sortByRecent(load(typeof window === "undefined" ? undefined : window.localStorage));
     setList(stored);
-    setActiveId(stored[0]?.id ?? null);
+    // /?c=<id> opens a specific conversation (used by the dashboard).
+    const wanted = new URLSearchParams(window.location.search).get("c");
+    setActiveId(stored.find((c) => c.id === wanted)?.id ?? stored[0]?.id ?? null);
     loaded.current = true;
   }, []);
 

@@ -36,3 +36,19 @@ export interface Conversation {
   messages: UiMessage[];
   updatedAt: string;
 }
+
+/** Mirrors GET /api/stats on the server. */
+export interface Stats {
+  startedAt: string;
+  generatedAt: string;
+  totals: { requests: number; answered: number; handedOff: number; errors: number; avgLatencyMs: number; tokens: number };
+  hourly: { hour: string; nim: number; delegated: number }[];
+  models: { model: string; source: "nim" | "delegated"; requests: number; tokens: number; avgLatencyMs: number | null; costUsd: number }[];
+  handoffs: {
+    byStatus: Record<HandoffStatus, number>;
+    byTarget: Record<HandoffTarget, number>;
+    costUsd: number;
+    recent: Handoff[];
+  };
+  mcp: { name: string; status: "online" | "offline" | "not-configured"; detail?: string }[];
+}

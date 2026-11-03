@@ -8,7 +8,7 @@ same commit that completes the task.
 - [x] 3. `apps/server`: Node/TypeScript API with a streaming chat endpoint that routes through the NIM router
 - [x] 4. Delegation layer: NIM hands off to Claude (Anthropic API) or the Claude Code agent only after the user approves the handoff in the UI
 - [x] 5. `apps/web`: Next.js + Tailwind + shadcn/ui chat UI (conversation list, streaming messages, markdown/code rendering, handoff approval prompts)
-- [ ] 6. Dashboards page: usage per model (NIM vs delegated), recent conversations, coding-agent task history, MCP server health
+- [x] 6. Dashboards page: usage per model (NIM vs delegated), recent conversations, coding-agent task history, MCP server health
 - [ ] 7. `mcp/filesystem`: MCP server for scoped read/write of a workspace folder
 - [ ] 8. `mcp/github`: MCP server for repos, issues and PRs (uses `GITHUB_TOKEN`)
 - [ ] 9. `mcp/claude-code`: MCP server that hands coding tasks to Claude Code (headless `claude -p`) and reports progress

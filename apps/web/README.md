@@ -13,4 +13,5 @@ Set `JARVIS_API_URL` if the server runs somewhere other than `http://127.0.0.1:8
 - Model label on every reply
 - Handoff cards: approve or decline a NIM handoff to Claude or Claude Code, then watch it run and read the result
 - Conversation list (stored in the browser for now; SQLite comes with the persistence task)
+- Dashboard at `/dashboard`: requests per hour (NIM vs handed off), usage and latency per model, handoff history and spend, MCP server status, recent conversations
 - Responsive: sidebar becomes a drawer on phones

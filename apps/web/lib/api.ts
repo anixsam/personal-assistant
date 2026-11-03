@@ -60,3 +60,7 @@ export async function health(): Promise<boolean> {
     return false;
   }
 }
+
+export async function getStats(hours = 24): Promise<import("./types").Stats> {
+  return json(await fetch(`/api/stats?hours=${hours}`));
+}

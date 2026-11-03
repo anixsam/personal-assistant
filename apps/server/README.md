@@ -9,6 +9,7 @@ pnpm --filter @jarvis/server dev   # reads ../../.env, listens on http://127.0.0
 | Method | Path | What it does |
 | --- | --- | --- |
 | GET | `/api/health` | Liveness check |
+| GET | `/api/stats?hours=24` | Dashboard numbers: totals, hourly NIM vs handoff counts, per-model usage, handoff history, MCP status |
 | POST | `/api/chat` | `{ messages }` → `{ kind: "answer", content, model }` or `{ kind: "handoff", handoff, model }` |
 | POST | `/api/chat/stream` | Same, as Server-Sent Events: `route`, `delta`, `handoff`, `error`, `done` |
 | GET | `/api/handoffs?status=pending` | Handoffs NIM proposed (statuses: pending, rejected, running, completed, failed) |

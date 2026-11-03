@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageSquare, Plus, Trash2, X } from "lucide-react";
+import Link from "next/link";
+import { LayoutDashboard, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Conversation } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -87,7 +88,12 @@ export function Sidebar({
             </div>
           ))}
         </nav>
-        <div className="border-t border-line px-4 py-3 text-xs text-muted">NVIDIA NIM first · Claude on approval</div>
+        <div className="border-t border-line px-3 py-3">
+          <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel-2 hover:text-fg">
+            <LayoutDashboard size={15} /> Dashboard
+          </Link>
+          <div className="px-3 pt-1 text-xs text-muted/70">NVIDIA NIM first · Claude on approval</div>
+        </div>
       </aside>
     </>
   );
