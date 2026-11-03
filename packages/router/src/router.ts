@@ -1,12 +1,16 @@
 import { NimClient } from "./nim.js";
 import type { DelegateTarget, NimMessage, NimTool, RouteResult } from "./types.js";
 
-export const JARVIS_SYSTEM_PROMPT = `You are Jarvis, a calm, courteous British butler-style personal assistant.
+export const FRIDAY_SYSTEM_PROMPT = `You are Friday, a warm, upbeat and friendly personal assistant. You are quick, kind and a little playful,
+and you call the user "boss" now and then. Keep replies short and natural, like talking to a helpful friend.
 Answer the user yourself whenever you can: conversation, questions, planning, short explanations and small code snippets.
 Only call the "delegate" tool when the request clearly needs something you should not do alone:
 - target "claude-code" for real coding work on a repository: implementing features, fixing bugs, running tests, editing files.
 - target "claude" for long, difficult reasoning or writing where a stronger model would do much better.
 When you delegate, write a self-contained task description. The user will be asked to approve the handoff first.`;
+
+/** @deprecated The assistant is now called Friday; kept so older imports keep working. */
+export const JARVIS_SYSTEM_PROMPT = FRIDAY_SYSTEM_PROMPT;
 
 export const DELEGATE_TOOL: NimTool = {
   type: "function",
@@ -18,7 +22,7 @@ export const DELEGATE_TOOL: NimTool = {
       properties: {
         target: { type: "string", enum: ["claude", "claude-code"] },
         task: { type: "string", description: "Self-contained description of what the other agent should do." },
-        reason: { type: "string", description: "One sentence on why Jarvis is not handling this itself." },
+        reason: { type: "string", description: "One sentence on why Friday is not handling this itself." },
       },
       required: ["target", "task", "reason"],
     },
@@ -68,7 +72,7 @@ export class JarvisRouter {
 
   private withSystem(history: NimMessage[]): NimMessage[] {
     const rest = history.filter((m) => m.role !== "system");
-    return [{ role: "system", content: this.opts.systemPrompt ?? JARVIS_SYSTEM_PROMPT }, ...rest];
+    return [{ role: "system", content: this.opts.systemPrompt ?? FRIDAY_SYSTEM_PROMPT }, ...rest];
   }
 }
 

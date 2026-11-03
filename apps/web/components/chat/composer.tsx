@@ -43,8 +43,8 @@ export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (tex
             submit();
           }
         }}
-        placeholder="Speak your mind, sir..."
-        aria-label="Message Jarvis"
+        placeholder="What can I do for you, boss?"
+        aria-label="Message Friday"
         className="scroll-thin max-h-[220px] min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-muted/60"
       />
       {busy ? (

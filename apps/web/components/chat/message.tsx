@@ -6,14 +6,14 @@ import type { Handoff, UiMessage } from "@/lib/types";
 import { HandoffCard } from "./handoff-card";
 import { Markdown } from "./markdown";
 
-/** Small Jarvis mark used in lists and headers. */
+/** Small Friday mark used in lists and headers. */
 export function JarvisMark({ size = 28 }: { size?: number }) {
   return <Reactor size={size} />;
 }
 
 function Typing() {
   return (
-    <div className="relative flex h-6 w-40 items-center overflow-hidden" aria-label="Jarvis is thinking">
+    <div className="relative flex h-6 w-40 items-center overflow-hidden" aria-label="Friday is thinking">
       <span className="font-hud text-xs text-accent/80">Processing</span>
       <span className="hud-sweep absolute inset-x-0 bottom-0 h-px bg-accent/20" />
     </div>
@@ -47,7 +47,7 @@ export function Message({ message, onHandoffChange, voice }: { message: UiMessag
       <Reactor size={30} state={coreState} level={mine ? voice.level : 0} className="mt-0.5" />
       <div className="hud-panel min-w-0 flex-1 space-y-2 rounded-md px-4 py-3">
         <div className="font-hud flex items-center gap-2 text-[11px] text-accent/80">
-          <span>Jarvis</span>
+          <span>Friday</span>
           {message.model && !message.streaming && <span className="truncate text-muted/70 normal-case tracking-normal">· {message.model}</span>}
           {voice.available && message.content && !message.streaming && (
             <button

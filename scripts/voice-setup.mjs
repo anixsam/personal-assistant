@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Downloads the Piper text-to-speech engine and Jarvis's stock British voice (en_GB-northern_english_male-medium)
+// Downloads the Piper text-to-speech engine and Friday's stock British voice (en_GB-northern_english_male-medium)
 // into ./voices. Run once: pnpm voice:setup
 // Extra stock voices: pnpm voice:setup en_GB-northern_english_male-medium en_GB-cori-high
 import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
@@ -60,4 +60,4 @@ for (const voice of voices) {
   await download(`${base}.onnx.json`, path.join(dir, `${voice}.onnx.json`));
 }
 
-console.log(`\nDone. Voice files are in ${dir}. Set PIPER_VOICE in .env to pick one, then restart Jarvis (pnpm dev).`);
+console.log(`\nDone. Voice files are in ${dir}. Set PIPER_VOICE in .env to pick one, then restart Friday (pnpm dev).`);

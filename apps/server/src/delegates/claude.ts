@@ -2,8 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Handoff } from "../handoffs.js";
 import type { Delegate, DelegateResult } from "./types.js";
 
-const SYSTEM = `You are helping Jarvis, a personal assistant. Jarvis has handed you a task it could not handle well itself.
-Complete the task fully and reply with the final answer only; it will be shown to the user in Jarvis's chat.`;
+const SYSTEM = `You are helping Friday, a personal assistant. Friday has handed you a task it could not handle well itself.
+Complete the task fully and reply with the final answer only; it will be shown to the user in Friday's chat.`;
 
 export interface ClaudeDelegateOptions {
   model?: string;
@@ -30,7 +30,7 @@ export class ClaudeDelegate implements Delegate {
         // If Claude declines on safety grounds, the API retries on a fallback model automatically.
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
-        messages: [{ role: "user", content: `${handoff.task}\n\n(Why Jarvis handed this off: ${handoff.reason})` }],
+        messages: [{ role: "user", content: `${handoff.task}\n\n(Why Friday handed this off: ${handoff.reason})` }],
       },
       { signal },
     );

@@ -1,6 +1,6 @@
 # @jarvis/mcp-github
 
-An MCP server (stdio) that lets Jarvis, or Claude Code, read your GitHub and open or comment on issues.
+An MCP server (stdio) that lets Friday, or Claude Code, read your GitHub and open or comment on issues.
 
 ```bash
 pnpm --filter @jarvis/mcp-github build

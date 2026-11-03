@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export type CoreState = "idle" | "thinking" | "speaking";
 
 /**
- * The Jarvis core: concentric HUD rings around a glowing centre.
+ * The Friday core: concentric HUD rings around a glowing centre.
  * Rings spin faster while thinking; the centre pulses with the voice level while speaking.
  */
 export function Reactor({ size = 64, state = "idle", level = 0, className }: { size?: number; state?: CoreState; level?: number; className?: string }) {
@@ -17,7 +17,7 @@ export function Reactor({ size = 64, state = "idle", level = 0, className }: { s
       className={cn("relative shrink-0", className)}
       style={{ width: size, height: size, ["--spin" as string]: speed }}
       role="img"
-      aria-label={state === "speaking" ? "Jarvis is speaking" : state === "thinking" ? "Jarvis is thinking" : "Jarvis"}
+      aria-label={state === "speaking" ? "Friday is speaking" : state === "thinking" ? "Friday is thinking" : "Friday"}
     >
       <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full overflow-visible">
         <defs>

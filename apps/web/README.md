@@ -1,6 +1,6 @@
 # @jarvis/web
 
-Jarvis chat UI (Next.js + Tailwind). Talks to `apps/server` through a `/api/*` proxy.
+Friday chat UI (Next.js + Tailwind). Talks to `apps/server` through a `/api/*` proxy.
 
 ```bash
 pnpm --filter @jarvis/server dev   # API on :8787 (needs NVIDIA_API_KEY in ../../.env)

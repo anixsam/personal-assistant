@@ -42,7 +42,7 @@ export function Sidebar({
         <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
           <JarvisMark size={30} />
           <div className="leading-tight">
-            <div className="font-hud text-base font-bold tracking-[0.35em] text-fg">J.A.R.V.I.S</div>
+            <div className="font-hud text-base font-bold tracking-[0.35em] text-fg">F.R.I.D.A.Y</div>
             <div className="font-hud flex items-center gap-1.5 text-[10px] text-muted">
               <span
                 className={cn(

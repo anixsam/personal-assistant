@@ -1,4 +1,6 @@
-# Jarvis
+# Friday
+
+> Formerly Jarvis. Internal package names (`@jarvis/*`) and `JARVIS_*` environment variables keep the old name so existing setups keep working.
 
 A personal assistant with a modern chat UI, dashboards, voice replies and Claude Code as its
 coding agent, built as a pnpm monorepo. Every request goes to NVIDIA NIM first, which hands off
@@ -33,7 +35,7 @@ Needs Node 22+ and pnpm 10 (`npm i -g pnpm@10.28.0`; on Windows, pnpm 11+ can fa
 
 Replies are spoken locally with [Piper](https://github.com/rhasspy/piper) using the stock
 `en_GB-northern_english_male-medium` voice. `pnpm voice:setup` downloads the Piper binary for your platform and the voice
-model into `./voices` (gitignored). Without it, Jarvis still works and simply stays silent. Use the
+model into `./voices` (gitignored). Without it, Friday still works and simply stays silent. Use the
 Voice toggle in the chat header to mute, or the Speak button on any reply to replay it.
 
 Progress is tracked in [ROADMAP.md](ROADMAP.md).

@@ -12,10 +12,10 @@ interface VoiceOption {
   gender: "female" | "male" | "unknown";
 }
 
-const SAMPLE = "Hi, I'm Jarvis. Everything's running smoothly. Shall I take a look at your day?";
+const SAMPLE = "Hi, I'm Friday. Everything's running smoothly. Shall I take a look at your day?";
 type Filter = "all" | "female" | "male";
 
-/** Lists installed voices; Play previews one, Use makes it Jarvis's voice. */
+/** Lists installed voices; Play previews one, Use makes it Friday's voice. */
 export function VoicePicker() {
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
@@ -80,7 +80,7 @@ export function VoicePicker() {
       {error && <p className="mb-3 text-sm text-bad">{error}</p>}
       {loaded && !voices.length && (
         <p className="text-sm text-muted">
-          No voices installed yet. Run <code>pnpm voice:setup</code>, then restart Jarvis.
+          No voices installed yet. Run <code>pnpm voice:setup</code>, then restart Friday.
         </p>
       )}
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

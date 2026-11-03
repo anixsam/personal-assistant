@@ -1,6 +1,6 @@
 # @jarvis/mcp-filesystem
 
-An MCP server (stdio) that gives Jarvis, or Claude Code, access to **one folder** and nothing else.
+An MCP server (stdio) that gives Friday, or Claude Code, access to **one folder** and nothing else.
 
 ```bash
 pnpm --filter @jarvis/mcp-filesystem build

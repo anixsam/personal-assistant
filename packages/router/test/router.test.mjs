@@ -62,3 +62,9 @@ test("retired model errors explain the fix", async () => {
   const nim = new NimClient(config, async () => new Response("gone", { status: 410 }));
   await assert.rejects(nim.chat([{ role: "user", content: "x" }]), /isn't available on NIM any more; set NIM_MODEL/);
 });
+
+test("the assistant persona is Friday", async () => {
+  const { FRIDAY_SYSTEM_PROMPT, JARVIS_SYSTEM_PROMPT } = await import("../dist/index.js");
+  assert.match(FRIDAY_SYSTEM_PROMPT, /^You are Friday/);
+  assert.equal(JARVIS_SYSTEM_PROMPT, FRIDAY_SYSTEM_PROMPT);
+});

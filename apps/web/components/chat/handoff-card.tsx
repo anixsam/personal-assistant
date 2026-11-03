@@ -59,7 +59,7 @@ export function HandoffCard({ handoff, onChange }: { handoff: Handoff; onChange:
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
         <ShieldQuestion size={16} className="text-accent" />
         <span className="text-sm">
-          Jarvis wants to hand this to <span className="font-medium text-fg">{t.label}</span>
+          Friday wants to hand this to <span className="font-medium text-fg">{t.label}</span>
           <span className="text-muted"> ({t.blurb})</span>
         </span>
         <span className={cn("ml-auto inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs", s.tone)}>

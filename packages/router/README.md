@@ -1,6 +1,6 @@
 # @jarvis/router
 
-Every Jarvis request goes to NVIDIA NIM first. NIM either answers directly or calls the
+Every Friday request goes to NVIDIA NIM first. NIM either answers directly or calls the
 `delegate` tool to propose handing the work to Claude (`claude`) or the Claude Code agent
 (`claude-code`). A handoff always comes back with `requiresApproval: true`, and the caller
 must get the user's approval before running it.

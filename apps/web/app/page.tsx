@@ -25,8 +25,8 @@ const SUGGESTIONS = [
 ];
 
 const HANDOFF_LINE = {
-  claude: "This one deserves a stronger mind, sir. Shall I bring in Claude?",
-  "claude-code": "This calls for the coding agent, sir. Shall I hand it to Claude Code?",
+  claude: "This one needs a bit more brainpower, boss. Want me to bring in Claude?",
+  "claude-code": "That's a job for the coding agent. Shall I hand it to Claude Code?",
 } as const;
 
 export default function ChatPage() {
@@ -38,7 +38,7 @@ export default function ChatPage() {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [hello, setHello] = useState("Good evening, sir.");
+  const [hello, setHello] = useState("Good evening, boss.");
 
   useEffect(() => setHello(greeting()), []);
 
@@ -97,7 +97,7 @@ export default function ChatPage() {
         ctrl.signal,
       );
     } catch (e) {
-      if (!ctrl.signal.aborted) patch({ error: e instanceof Error ? e.message : "Could not reach Jarvis" });
+      if (!ctrl.signal.aborted) patch({ error: e instanceof Error ? e.message : "Could not reach Friday" });
     } finally {
       patch((m) => ({ streaming: false, content: m.content || (ctrl.signal.aborted && !m.handoff ? "_Stopped._" : m.content) }));
       setBusy(false);
@@ -161,7 +161,7 @@ export default function ChatPage() {
           <HudClock />
           <Link
             href="/dashboard#voice"
-            title="Pick Jarvis's voice"
+            title="Pick Friday's voice"
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-accent/30 px-2.5 text-muted hover:text-fg"
           >
             <AudioLines size={15} />

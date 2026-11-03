@@ -22,7 +22,7 @@ export default function DashboardPage() {
       setStats(await getStats(24));
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach the Jarvis server");
+      setError(e instanceof Error ? e.message : "Could not reach the Friday server");
     }
   }
 
@@ -87,7 +87,7 @@ export default function DashboardPage() {
         </div>
 
         <section id="voice" className="scroll-mt-20">
-          <Panel title="Jarvis's voice">
+          <Panel title="Friday's voice">
             <VoicePicker />
           </Panel>
         </section>

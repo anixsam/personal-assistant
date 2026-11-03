@@ -71,7 +71,7 @@ const STATUS: Record<HandoffStatus, { label: string; icon: React.ElementType; to
 };
 
 export function HandoffHistory({ handoffs }: { handoffs: Stats["handoffs"]["recent"] }) {
-  if (!handoffs.length) return <Empty>No handoffs yet. Jarvis will list Claude and Claude Code tasks here.</Empty>;
+  if (!handoffs.length) return <Empty>No handoffs yet. Friday will list Claude and Claude Code tasks here.</Empty>;
   return (
     <ul className="divide-y divide-line">
       {handoffs.map((h) => {

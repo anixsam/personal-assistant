@@ -53,5 +53,5 @@ const port = Number(env.PORT) || 8787;
 const app = createApp({ router, delegates, voice, corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
 
 serve({ fetch: app.fetch, port, hostname: env.HOST || "127.0.0.1" }, (info) => {
-  console.log(`Jarvis server listening on http://${info.address}:${info.port}`);
+  console.log(`Friday server listening on http://${info.address}:${info.port}`);
 });

@@ -99,10 +99,10 @@ export function createApp({
   // Spoken replies. Small cache so replaying a message doesn't re-synthesize it.
   const audioCache = new Map<string, Buffer>();
   app.get("/api/voice", (c) =>
-    c.json({ enabled: !!voice?.available(), voice: voice?.voiceName ?? null, setup: voice?.available() ? null : "Run pnpm voice:setup, then restart Jarvis" }),
+    c.json({ enabled: !!voice?.available(), voice: voice?.voiceName ?? null, setup: voice?.available() ? null : "Run pnpm voice:setup, then restart Friday" }),
   );
   app.post("/api/speak", async (c) => {
-    if (!voice?.available()) return c.json({ error: "Voice isn't set up. Run pnpm voice:setup, then restart Jarvis." }, 503);
+    if (!voice?.available()) return c.json({ error: "Voice isn't set up. Run pnpm voice:setup, then restart Friday." }, 503);
     const body = (await c.req.json().catch(() => null)) as { text?: unknown; voice?: unknown } | null;
     if (typeof body?.text !== "string" || !body.text.trim()) return c.json({ error: "text is required" }, 400);
     const voiceId = typeof body.voice === "string" && body.voice ? body.voice : undefined;

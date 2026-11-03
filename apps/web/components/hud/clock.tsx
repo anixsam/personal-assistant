@@ -20,5 +20,5 @@ export function HudClock() {
 
 export function greeting(d = new Date()): string {
   const h = d.getHours();
-  return h < 5 ? "Working late, sir?" : h < 12 ? "Good morning, sir." : h < 17 ? "Good afternoon, sir." : "Good evening, sir.";
+  return h < 5 ? "Working late, boss?" : h < 12 ? "Good morning, boss." : h < 17 ? "Good afternoon, boss." : "Good evening, boss.";
 }

@@ -119,7 +119,7 @@ export class StatsStore {
   }
 }
 
-/** MCP servers Jarvis will use. They're wired in later roadmap tasks, so for now they report not-configured. */
+/** MCP servers Friday will use. They're wired in later roadmap tasks, so for now they report not-configured. */
 export const PLANNED_MCP_SERVERS = ["filesystem", "github", "claude-code"] as const;
 
 export function defaultMcpStatus(): McpStatus[] {
