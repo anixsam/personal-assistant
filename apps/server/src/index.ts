@@ -41,7 +41,7 @@ const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..
 const voiceName = env.PIPER_VOICE || "en_GB-northern_english_male-medium";
 const defaults = defaultVoicePaths(repoRoot, voiceName);
 const piperBin = env.PIPER_BIN && isAbsolute(env.PIPER_BIN) && existsSync(env.PIPER_BIN) ? env.PIPER_BIN : existsSync(defaults.bin) ? defaults.bin : env.PIPER_BIN || defaults.bin;
-const piper = new PiperVoice({ bin: piperBin, model: env.PIPER_MODEL || defaults.model, lengthScale: Number(env.PIPER_LENGTH_SCALE) || undefined });
+const piper = new PiperVoice({ bin: piperBin, model: env.PIPER_MODEL || defaults.model, lengthScale: Number(env.PIPER_LENGTH_SCALE) || undefined, speaker: env.PIPER_SPEAKER ? Number(env.PIPER_SPEAKER) : undefined });
 const voice = Object.assign(piper, { voiceName });
 if (!piper.available()) console.warn("Voice not set up: run `pnpm voice:setup` for spoken replies.");
 

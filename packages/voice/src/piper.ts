@@ -11,6 +11,8 @@ export interface PiperOptions {
   model: string;
   /** Speaking speed: below 1 is faster, above 1 slower. */
   lengthScale?: number;
+  /** Speaker id for multi-speaker voices (e.g. en_GB-vctk-medium, en_GB-semaine-medium). */
+  speaker?: number;
   timeoutMs?: number;
 }
 
@@ -40,6 +42,7 @@ export class PiperVoice {
     const outFile = path.join(tmpdir(), `jarvis-voice-${randomUUID()}.wav`);
     const args = ["--model", this.opts.model, "--output_file", outFile, "--quiet"];
     if (this.opts.lengthScale) args.push("--length_scale", String(this.opts.lengthScale));
+    if (this.opts.speaker !== undefined) args.push("--speaker", String(this.opts.speaker));
     return new Promise((resolve, reject) => {
       const child = this.spawner(this.opts.bin, args, {
         stdio: ["pipe", "ignore", "pipe"],

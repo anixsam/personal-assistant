@@ -36,6 +36,13 @@ test("synthesize pipes one line to piper and returns WAV", async () => {
   assert.equal(seen[0].opts.cwd, "/opt/piper");
 });
 
+test("synthesize passes speaker and pace when set", async () => {
+  const seen = [];
+  const wav = Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(60)]);
+  await new PiperVoice({ bin: "p", model: "m", speaker: 3, lengthScale: 0.9 }, fakeSpawn(wav, 0, seen)).synthesize("hi");
+  assert.deepEqual(seen[0].args.slice(-4), ["--length_scale", "0.9", "--speaker", "3"]);
+});
+
 test("synthesize rejects on failure, empty text or non-WAV output", async () => {
   await assert.rejects(new PiperVoice({ bin: "p", model: "m" }, fakeSpawn(Buffer.alloc(0), 1)).synthesize("hi"), /exited with 1/);
   await assert.rejects(new PiperVoice({ bin: "p", model: "m" }, fakeSpawn(Buffer.from("nope"))).synthesize("hi"), /no audio/);
