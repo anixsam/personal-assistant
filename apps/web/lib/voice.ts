@@ -110,7 +110,7 @@ export class VoicePlayer {
   }
 
   /** Speaks `text`; resolves when playback ends or is stopped. */
-  async speak(text: string, messageId: string | null = null): Promise<void> {
+  async speak(text: string, messageId: string | null = null, voiceId?: string): Promise<void> {
     this.stop();
     const abort = new AbortController();
     this.abort = abort;
@@ -119,7 +119,7 @@ export class VoicePlayer {
       const res = await fetch("/api/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(voiceId ? { text, voice: voiceId } : { text }),
         signal: abort.signal,
       });
       if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || `Voice failed (${res.status})`);

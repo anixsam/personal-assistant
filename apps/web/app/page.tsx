@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, Sparkles, Volume2, VolumeX } from "lucide-react";
+import Link from "next/link";
+import { AudioLines, Menu, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { Message, type SpeakControls } from "@/components/chat/message";
 import { Sidebar } from "@/components/chat/sidebar";
@@ -158,6 +159,14 @@ export default function ChatPage() {
             </div>
           </div>
           <HudClock />
+          <Link
+            href="/dashboard#voice"
+            title="Pick Jarvis's voice"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-accent/30 px-2.5 text-muted hover:text-fg"
+          >
+            <AudioLines size={15} />
+            <span className="font-hud hidden text-[11px] sm:inline">Voices</span>
+          </Link>
           <Button
             variant="outline"
             size="sm"

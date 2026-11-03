@@ -128,3 +128,26 @@ test("voice: status, 503 when not set up, WAV when set up, cached", async () => 
   assert.equal(calls, 1, "second request served from cache");
   assert.equal((await post(app, "/api/speak", {})).status, 400);
 });
+
+test("voices: list, preview with another voice, select", async () => {
+  let current = "a";
+  const used = [];
+  const voice = {
+    available: () => true,
+    options: () => [{ id: "a", label: "A", description: "", gender: "male" }, { id: "b", label: "B", description: "", gender: "female" }],
+    current: () => current,
+    select: (id) => { if (id !== "a" && id !== "b") throw new Error(`Voice "${id}" isn't installed`); current = id; },
+    synthesize: async (t, id) => { used.push(id ?? current); return Buffer.from("RIFF0000"); },
+  };
+  const app = createApp({ router: answerRouter, voice });
+  const list = await (await app.request("/api/voices")).json();
+  assert.equal(list.current, "a");
+  assert.deepEqual(list.voices.map((v) => v.id), ["a", "b"]);
+  assert.equal((await post(app, "/api/speak", { text: "hi", voice: "b" })).status, 200);
+  assert.equal((await post(app, "/api/speak", { text: "hi", voice: "zzz" })).status, 404);
+  const put = (body) => app.request("/api/voices", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  assert.equal((await put({ voice: "zzz" })).status, 404);
+  assert.deepEqual(await (await put({ voice: "b" })).json(), { current: "b" });
+  await post(app, "/api/speak", { text: "hello" });
+  assert.deepEqual(used, ["b", "b"]);
+});

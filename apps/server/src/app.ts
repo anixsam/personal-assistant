@@ -10,8 +10,13 @@ import { speakable } from "@jarvis/voice";
 /** Text-to-speech used for spoken replies (Piper in production, a fake in tests). */
 export interface Speaker {
   available(): boolean;
-  synthesize(text: string): Promise<Buffer>;
+  /** `voiceId` picks another installed voice (previews); omitted means the selected one. */
+  synthesize(text: string, voiceId?: string): Promise<Buffer>;
   readonly voiceName?: string;
+  /** Voice picker support (VoiceLibrary). Optional so a plain single voice still works. */
+  options?(): { id: string; label: string; description: string; gender: string }[];
+  current?(): string;
+  select?(id: string): void;
 }
 
 /** The part of JarvisRouter the server needs (lets tests pass a fake). */
@@ -98,21 +103,40 @@ export function createApp({
   );
   app.post("/api/speak", async (c) => {
     if (!voice?.available()) return c.json({ error: "Voice isn't set up. Run pnpm voice:setup, then restart Jarvis." }, 503);
-    const body = (await c.req.json().catch(() => null)) as { text?: unknown } | null;
+    const body = (await c.req.json().catch(() => null)) as { text?: unknown; voice?: unknown } | null;
     if (typeof body?.text !== "string" || !body.text.trim()) return c.json({ error: "text is required" }, 400);
+    const voiceId = typeof body.voice === "string" && body.voice ? body.voice : undefined;
+    if (voiceId && !voice.options?.().some((o) => o.id === voiceId)) return c.json({ error: `Voice "${voiceId}" isn't installed` }, 404);
     const text = speakable(body.text);
     if (!text) return c.json({ error: "Nothing to say" }, 400);
+    const key = `${voiceId ?? voice.current?.() ?? ""}\u0000${text}`;
     try {
-      let wav = audioCache.get(text);
+      let wav = audioCache.get(key);
       if (!wav) {
-        wav = await voice.synthesize(text);
-        audioCache.set(text, wav);
+        wav = voiceId ? await voice.synthesize(text, voiceId) : await voice.synthesize(text);
+        audioCache.set(key, wav);
         if (audioCache.size > 50) audioCache.delete(audioCache.keys().next().value as string);
       }
       return new Response(new Uint8Array(wav), { headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store" } });
     } catch (err) {
       return c.json({ error: errorMessage(err) }, 500);
     }
+  });
+
+  /** Voice picker: installed voices and the one in use. */
+  app.get("/api/voices", (c) =>
+    c.json({ current: voice?.current?.() ?? voice?.voiceName ?? null, voices: voice?.options?.() ?? [], canSelect: !!voice?.select }),
+  );
+  app.put("/api/voices", async (c) => {
+    if (!voice?.select) return c.json({ error: "Voice picking isn't available" }, 501);
+    const body = (await c.req.json().catch(() => null)) as { voice?: unknown } | null;
+    if (typeof body?.voice !== "string" || !body.voice) return c.json({ error: "voice is required" }, 400);
+    try {
+      voice.select(body.voice);
+    } catch (err) {
+      return c.json({ error: errorMessage(err) }, 404);
+    }
+    return c.json({ current: voice.current?.() ?? body.voice });
   });
 
   /** Dashboard numbers: usage per model, hourly traffic, handoff history, MCP health. */

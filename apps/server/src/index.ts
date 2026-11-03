@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PiperVoice, defaultVoicePaths } from "@jarvis/voice";
+import { VoiceLibrary, defaultVoicePaths } from "@jarvis/voice";
 import { serve } from "@hono/node-server";
 import { JarvisRouter, NimClient, loadNimConfig } from "@jarvis/router";
 import { createApp } from "./app.js";
@@ -41,9 +41,13 @@ const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..
 const voiceName = env.PIPER_VOICE || "en_GB-northern_english_male-medium";
 const defaults = defaultVoicePaths(repoRoot, voiceName);
 const piperBin = env.PIPER_BIN && isAbsolute(env.PIPER_BIN) && existsSync(env.PIPER_BIN) ? env.PIPER_BIN : existsSync(defaults.bin) ? defaults.bin : env.PIPER_BIN || defaults.bin;
-const piper = new PiperVoice({ bin: piperBin, model: env.PIPER_MODEL || defaults.model, lengthScale: Number(env.PIPER_LENGTH_SCALE) || undefined, speaker: env.PIPER_SPEAKER ? Number(env.PIPER_SPEAKER) : undefined });
-const voice = Object.assign(piper, { voiceName });
-if (!piper.available()) console.warn("Voice not set up: run `pnpm voice:setup` for spoken replies.");
+const voice = new VoiceLibrary({
+  dir: dirname(env.PIPER_MODEL || defaults.model),
+  bin: piperBin,
+  fallback: env.PIPER_MODEL ? basename(env.PIPER_MODEL, ".onnx") : env.PIPER_SPEAKER ? `${voiceName}#${env.PIPER_SPEAKER}` : voiceName,
+  lengthScale: Number(env.PIPER_LENGTH_SCALE) || undefined,
+});
+if (!voice.available()) console.warn("Voice not set up: run `pnpm voice:setup` for spoken replies.");
 
 const port = Number(env.PORT) || 8787;
 const app = createApp({ router, delegates, voice, corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });

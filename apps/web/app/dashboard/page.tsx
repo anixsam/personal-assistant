@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { HourlyChart } from "@/components/dashboard/hourly-chart";
+import { VoicePicker } from "@/components/dashboard/voice-picker";
 import { HandoffHistory, McpHealth, ModelTable, Panel, RecentConversations, StatTile } from "@/components/dashboard/panels";
 import { JarvisMark } from "@/components/chat/message";
 import { getStats } from "@/lib/api";
@@ -84,6 +85,12 @@ export default function DashboardPage() {
             <RecentConversations conversations={conversations} />
           </Panel>
         </div>
+
+        <section id="voice" className="scroll-mt-20">
+          <Panel title="Jarvis's voice">
+            <VoicePicker />
+          </Panel>
+        </section>
 
         {stats && <p className="text-center text-xs text-muted">Server up since {new Date(stats.startedAt).toLocaleString()} · numbers reset on restart until saved history is added</p>}
       </main>
