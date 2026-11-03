@@ -10,7 +10,7 @@ same commit that completes the task.
 - [x] 5. `apps/web`: Next.js + Tailwind + shadcn/ui chat UI (conversation list, streaming messages, markdown/code rendering, handoff approval prompts)
 - [x] 6. Dashboards page: usage per model (NIM vs delegated), recent conversations, coding-agent task history, MCP server health
 - [x] 7. `mcp/filesystem`: MCP server for scoped read/write of a workspace folder
-- [ ] 8. `mcp/github`: MCP server for repos, issues and PRs (uses `GITHUB_TOKEN`)
+- [x] 8. `mcp/github`: MCP server for repos, issues and PRs (uses `GITHUB_TOKEN`)
 - [ ] 9. `mcp/claude-code`: MCP server that hands coding tasks to Claude Code (headless `claude -p`) and reports progress
 - [ ] 10. Wire the MCP servers into the tool loop, plus a `.mcp.json` for using them from Claude Code directly
 - [ ] 11. `packages/voice`: Piper TTS wrapper using a British male voice (`en_GB-alan-medium`), with a voice-download script

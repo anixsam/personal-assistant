@@ -95,7 +95,18 @@ importers:
         specifier: ^22.20.5
         version: 22.20.5
 
-  mcp/github: {}
+  mcp/github:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@3.25.76)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
 
   packages/router:
     devDependencies:
