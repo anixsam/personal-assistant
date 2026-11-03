@@ -12,6 +12,9 @@ export class VoicePlayer {
   private raf = 0;
   private abort: AbortController | null = null;
   private listeners = new Set<Listener>();
+  private fxInput: AudioNode | null = null;
+  /** "Studio" effect: light room reverb, gentle shimmer and presence, for a movie-AI feel. */
+  fx = false;
   state: VoiceState = "idle";
   messageId: string | null = null;
   level = 0;
@@ -50,6 +53,62 @@ export class VoicePlayer {
     this.set("idle", null);
   }
 
+  /** Builds (once) the studio effect chain feeding `out` and returns its input node. */
+  private studioChain(ctx: AudioContext, out: AudioNode): AudioNode {
+    if (this.fxInput) return this.fxInput;
+    const input = ctx.createGain();
+    // Clean up rumble and add a little presence so the voice sounds "produced".
+    const hp = Object.assign(ctx.createBiquadFilter(), { type: "highpass" as BiquadFilterType });
+    hp.frequency.value = 110;
+    const presence = Object.assign(ctx.createBiquadFilter(), { type: "peaking" as BiquadFilterType });
+    presence.frequency.value = 3200;
+    presence.Q.value = 0.9;
+    presence.gain.value = 3;
+    const air = Object.assign(ctx.createBiquadFilter(), { type: "highshelf" as BiquadFilterType });
+    air.frequency.value = 8000;
+    air.gain.value = 2;
+    input.connect(hp).connect(presence).connect(air);
+
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.005;
+    comp.release.value = 0.15;
+    comp.connect(out);
+
+    const dry = ctx.createGain();
+    dry.gain.value = 0.9;
+    air.connect(dry).connect(comp);
+
+    // Small bright room: a synthetic decaying-noise impulse response (no samples needed).
+    const len = Math.floor(ctx.sampleRate * 0.9);
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+    }
+    const reverb = Object.assign(ctx.createConvolver(), { buffer: ir });
+    const wet = ctx.createGain();
+    wet.gain.value = 0.22;
+    air.connect(reverb).connect(wet).connect(comp);
+
+    // Gentle shimmer: a short modulated delay (chorus) mixed in quietly.
+    const delay = ctx.createDelay(0.05);
+    delay.delayTime.value = 0.014;
+    const lfo = Object.assign(ctx.createOscillator(), { type: "sine" as OscillatorType });
+    lfo.frequency.value = 0.35;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.0018;
+    lfo.connect(depth).connect(delay.delayTime);
+    lfo.start();
+    const chorus = ctx.createGain();
+    chorus.gain.value = 0.18;
+    air.connect(delay).connect(chorus).connect(comp);
+
+    this.fxInput = input;
+    return input;
+  }
+
   /** Speaks `text`; resolves when playback ends or is stopped. */
   async speak(text: string, messageId: string | null = null): Promise<void> {
     this.stop();
@@ -74,7 +133,7 @@ export class VoicePlayer {
       this.analyser.connect(this.ctx.destination);
       const src = this.ctx.createBufferSource();
       src.buffer = buffer;
-      src.connect(this.analyser);
+      src.connect(this.fx ? this.studioChain(this.ctx, this.analyser) : this.analyser);
       this.source = src;
       this.set("speaking", messageId);
       const samples = new Uint8Array(this.analyser.fftSize);

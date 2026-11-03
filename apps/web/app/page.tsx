@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu, Volume2, VolumeX } from "lucide-react";
+import { Menu, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { Message, type SpeakControls } from "@/components/chat/message";
 import { Sidebar } from "@/components/chat/sidebar";
@@ -158,6 +158,18 @@ export default function ChatPage() {
             </div>
           </div>
           <HudClock />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!voice.available || voice.muted}
+            onClick={() => voice.setFx(!voice.fx)}
+            aria-pressed={voice.fx}
+            title="Studio effect: light reverb and shimmer on the voice"
+            className={voice.fx ? "border-accent/60 bg-accent/10" : "border-accent/30"}
+          >
+            <Sparkles size={15} className={voice.fx ? "text-accent" : undefined} />
+            <span className="font-hud hidden text-[11px] sm:inline">{voice.fx ? "FX on" : "FX off"}</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
