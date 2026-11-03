@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { writeFileSync, existsSync } from "node:fs";
 import { PiperVoice, speakable } from "../dist/index.js";
 
 test("speakable strips markdown and code", () => {
@@ -17,7 +18,7 @@ function fakeSpawn(stdout, code = 0, seen = []) {
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
     let input = "";
-    child.stdin = { end: (t) => { input = t; seen.push({ bin, args, input, opts }); setImmediate(() => { child.stdout.emit("data", stdout); child.emit("close", code); }); } };
+    child.stdin = { end: (t) => { input = t; seen.push({ bin, args, input, opts }); setImmediate(() => { const f = args[args.indexOf("--output_file") + 1]; if (stdout.length) writeFileSync(f, stdout); child.emit("close", code); }); } };
     return child;
   };
 }
@@ -29,7 +30,9 @@ test("synthesize pipes one line to piper and returns WAV", async () => {
   const out = await v.synthesize("Hello,\n  sir.");
   assert.equal(out.subarray(0, 4).toString(), "RIFF");
   assert.equal(seen[0].input, "Hello, sir.\n");
-  assert.deepEqual(seen[0].args.slice(0, 4), ["--model", "/v/alan.onnx", "--output_file", "-"]);
+  assert.deepEqual(seen[0].args.slice(0, 3), ["--model", "/v/alan.onnx", "--output_file"]);
+  assert.match(seen[0].args[3], /jarvis-voice-.*\.wav$/);
+  assert.equal(existsSync(seen[0].args[3]), false, "temp file is cleaned up");
   assert.equal(seen[0].opts.cwd, "/opt/piper");
 });
 
