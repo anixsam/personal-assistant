@@ -35,15 +35,15 @@ export function Sidebar({
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-line bg-panel transition-transform md:static md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-accent/15 bg-panel/90 backdrop-blur transition-transform md:static md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
           <JarvisMark size={30} />
           <div className="leading-tight">
-            <div className="font-semibold tracking-[0.2em]">JARVIS</div>
-            <div className="flex items-center gap-1.5 text-xs text-muted">
+            <div className="font-hud text-base font-bold tracking-[0.35em] text-fg">J.A.R.V.I.S</div>
+            <div className="font-hud flex items-center gap-1.5 text-[10px] text-muted">
               <span
                 className={cn(
                   "h-1.5 w-1.5 rounded-full",

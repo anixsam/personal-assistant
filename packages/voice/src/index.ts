@@ -1,2 +1,2 @@
-// TODO: Piper TTS wrapper, implemented in a later build step
-export {};
+export { PiperVoice, VoiceError, defaultVoicePaths, type PiperOptions } from "./piper.js";
+export { speakable } from "./text.js";

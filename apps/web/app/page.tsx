@@ -1,16 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu, Volume2, VolumeX } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
-import { JarvisMark, Message } from "@/components/chat/message";
+import { Message, type SpeakControls } from "@/components/chat/message";
 import { Sidebar } from "@/components/chat/sidebar";
+import { HudClock, greeting } from "@/components/hud/clock";
+import { Reactor, type CoreState } from "@/components/hud/reactor";
 import { Button } from "@/components/ui/button";
 import { health, streamChat } from "@/lib/api";
 import { appendMessage, toWire, updateMessage } from "@/lib/conversations";
 import type { Handoff, UiMessage } from "@/lib/types";
 import { useConversations } from "@/lib/use-conversations";
+import { useVoice } from "@/lib/use-voice";
 import { uid } from "@/lib/utils";
+import { voicePlayer } from "@/lib/voice";
 
 const SUGGESTIONS = [
   "What's on my plate today?",
@@ -19,13 +23,23 @@ const SUGGESTIONS = [
   "Fix the failing tests in my repo",
 ];
 
+const HANDOFF_LINE = {
+  claude: "This one deserves a stronger mind, sir. Shall I bring in Claude?",
+  "claude-code": "This calls for the coding agent, sir. Shall I hand it to Claude Code?",
+} as const;
+
 export default function ChatPage() {
   const { list, active, activeId, setActiveId, update, create, remove } = useConversations();
+  const voice = useVoice();
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [hello, setHello] = useState("Good evening, sir.");
+
+  useEffect(() => setHello(greeting()), []);
 
   useEffect(() => {
     let alive = true;
@@ -44,26 +58,39 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messageCount, lastContent, activeId]);
 
+  const speak = useCallback((text: string, id: string | null) => {
+    setVoiceError(null);
+    voicePlayer.speak(text, id).catch((e) => setVoiceError(e instanceof Error ? e.message : "Voice failed"));
+  }, []);
+
   async function send(text: string) {
+    voicePlayer.stop();
     const convo = active ?? create();
     const user: UiMessage = { id: uid(), role: "user", content: text, createdAt: new Date().toISOString() };
     const reply: UiMessage = { id: uid(), role: "assistant", content: "", createdAt: new Date().toISOString(), streaming: true };
     const history = toWire([...convo.messages, user]);
     update(convo.id, (c) => appendMessage(appendMessage(c, user), reply));
-    // `create()` state may not be flushed yet; make sure the new conversation exists.
     if (!active) setActiveId(convo.id);
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setBusy(true);
     const patch = (p: Partial<UiMessage> | ((m: UiMessage) => Partial<UiMessage>)) => update(convo.id, (c) => updateMessage(c, reply.id, p));
+    let answer = "";
+    let handoff: Handoff | null = null;
     try {
       await streamChat(
         history,
         {
           onRoute: ({ model }) => patch({ model }),
-          onDelta: (t) => patch((m) => ({ content: m.content + t })),
-          onHandoff: (handoff) => patch({ handoff }),
+          onDelta: (t) => {
+            answer += t;
+            patch((m) => ({ content: m.content + t }));
+          },
+          onHandoff: (h) => {
+            handoff = h;
+            patch({ handoff: h });
+          },
           onError: (error) => patch({ error }),
         },
         ctrl.signal,
@@ -75,6 +102,11 @@ export default function ChatPage() {
       setBusy(false);
       abortRef.current = null;
     }
+    if (voice.available && !voice.muted && !ctrl.signal.aborted) {
+      const h = handoff as Handoff | null;
+      if (answer.trim()) speak(answer, reply.id);
+      else if (h) speak(HANDOFF_LINE[h.target], reply.id);
+    }
   }
 
   const onHandoffChange = useCallback(
@@ -84,6 +116,16 @@ export default function ChatPage() {
     },
     [activeId, update],
   );
+
+  const controls: SpeakControls = {
+    available: voice.available,
+    activeId: voice.messageId,
+    state: voice.state,
+    level: voice.level,
+    onSpeak: (m) => speak(m.content, m.id),
+    onStop: () => voicePlayer.stop(),
+  };
+  const coreState: CoreState = voice.state === "speaking" ? "speaking" : busy || voice.state === "loading" ? "thinking" : "idle";
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -104,22 +146,41 @@ export default function ChatPage() {
         onDelete={remove}
       />
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center gap-2 border-b border-line px-3 md:px-6">
+        <header className="flex h-14 items-center gap-3 border-b border-accent/15 bg-bg/60 px-3 backdrop-blur md:px-6">
           <Button size="icon" className="md:hidden" onClick={() => setMenuOpen(true)} aria-label="Open menu">
             <Menu size={18} />
           </Button>
-          <h1 className="truncate text-sm font-medium">{active?.title ?? "New conversation"}</h1>
+          <Reactor size={30} state={coreState} level={voice.level} />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-medium">{active?.title ?? "New conversation"}</h1>
+            <div className="font-hud text-[10px] text-muted">
+              {coreState === "speaking" ? "Speaking" : coreState === "thinking" ? "Processing" : online === false ? "Server offline" : "Standing by"}
+            </div>
+          </div>
+          <HudClock />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!voice.available}
+            onClick={() => voice.setMuted(!voice.muted)}
+            title={voice.available ? undefined : "Run pnpm voice:setup to enable voice"}
+            aria-label={voice.muted ? "Unmute voice" : "Mute voice"}
+            className="border-accent/30"
+          >
+            {voice.available && !voice.muted ? <Volume2 size={15} className="text-accent" /> : <VolumeX size={15} />}
+            <span className="font-hud hidden text-[11px] sm:inline">{!voice.available ? "Voice off" : voice.muted ? "Muted" : "Voice on"}</span>
+          </Button>
         </header>
 
         <div className="scroll-thin flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl px-4 py-6 md:px-6">
             {!active || active.messages.length === 0 ? (
-              <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-                <JarvisMark size={64} />
-                <h2 className="mt-6 text-2xl font-semibold">Good to see you.</h2>
-                <p className="mt-2 max-w-md text-sm text-muted">
-                  I answer with NVIDIA NIM. For heavier work I&apos;ll suggest handing off to Claude or Claude Code, and I&apos;ll
-                  wait for your approval first.
+              <div className="flex min-h-[62vh] flex-col items-center justify-center text-center">
+                <Reactor size={180} state={coreState} level={voice.level} />
+                <h2 className="mt-8 text-3xl font-semibold tracking-tight">{hello}</h2>
+                <p className="font-hud mt-2 text-xs text-accent/70">All systems online</p>
+                <p className="mt-3 max-w-md text-sm text-muted">
+                  I answer with NVIDIA NIM. For heavier work I&apos;ll suggest handing off to Claude or Claude Code, and I&apos;ll wait for your approval first.
                 </p>
                 <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
                   {SUGGESTIONS.map((s) => (
@@ -127,7 +188,7 @@ export default function ChatPage() {
                       key={s}
                       onClick={() => send(s)}
                       disabled={busy}
-                      className="rounded-xl border border-line bg-panel px-4 py-3 text-left text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg"
+                      className="hud-panel rounded-md px-4 py-3 text-left text-sm text-muted transition-colors hover:border-accent/50 hover:text-fg"
                     >
                       {s}
                     </button>
@@ -137,7 +198,7 @@ export default function ChatPage() {
             ) : (
               <div className="space-y-6">
                 {active.messages.map((m) => (
-                  <Message key={m.id} message={m} onHandoffChange={onHandoffChange} />
+                  <Message key={m.id} message={m} onHandoffChange={onHandoffChange} voice={controls} />
                 ))}
               </div>
             )}
@@ -146,8 +207,9 @@ export default function ChatPage() {
         </div>
 
         <div className="mx-auto w-full max-w-3xl px-4 pb-4 md:px-6">
+          {voiceError && <p className="mb-2 text-center text-xs text-warn">{voiceError}</p>}
           <Composer busy={busy} onSend={send} onStop={() => abortRef.current?.abort()} />
-          <p className="mt-2 text-center text-[11px] text-muted/70">Enter to send · Shift+Enter for a new line</p>
+          <p className="font-hud mt-2 text-center text-[10px] text-muted/60">Enter to send · Shift+Enter for a new line</p>
         </div>
       </main>
     </div>

@@ -110,3 +110,21 @@ test("chunk keeps all text", () => {
   const s = "The quick brown fox jumps over the lazy dog, sir. ".repeat(3);
   assert.equal(chunk(s).join(""), s);
 });
+
+test("voice: status, 503 when not set up, WAV when set up, cached", async () => {
+  assert.equal((await (await createApp({ router: answerRouter }).request("/api/voice")).json()).enabled, false);
+  assert.equal((await post(createApp({ router: answerRouter }), "/api/speak", { text: "hi" })).status, 503);
+  let calls = 0;
+  const said = [];
+  const voice = { voiceName: "en_GB-alan-medium", available: () => true, synthesize: async (t) => { calls++; said.push(t); return Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(40)]); } };
+  const app = createApp({ router: answerRouter, voice });
+  assert.deepEqual(await (await app.request("/api/voice")).json(), { enabled: true, voice: "en_GB-alan-medium", setup: null });
+  const res = await post(app, "/api/speak", { text: "**Good evening**, sir." });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "audio/wav");
+  assert.equal(Buffer.from(await res.arrayBuffer()).subarray(0, 4).toString(), "RIFF");
+  assert.deepEqual(said, ["Good evening, sir."]);
+  await post(app, "/api/speak", { text: "**Good evening**, sir." });
+  assert.equal(calls, 1, "second request served from cache");
+  assert.equal((await post(app, "/api/speak", {})).status, 400);
+});

@@ -5,6 +5,14 @@ import type { NimMessage, RouteResult } from "@jarvis/router";
 import { HandoffStore, HANDOFF_STATUSES, type Handoff } from "./handoffs.js";
 import type { Delegates } from "./delegates/types.js";
 import { StatsStore, defaultMcpStatus, type McpStatus } from "./stats.js";
+import { speakable } from "@jarvis/voice";
+
+/** Text-to-speech used for spoken replies (Piper in production, a fake in tests). */
+export interface Speaker {
+  available(): boolean;
+  synthesize(text: string): Promise<Buffer>;
+  readonly voiceName?: string;
+}
 
 /** The part of JarvisRouter the server needs (lets tests pass a fake). */
 export interface ChatRouter {
@@ -17,6 +25,7 @@ export interface AppDeps {
   /** Executors for approved handoffs. A missing target makes approval fail with 503. */
   delegates?: Delegates;
   stats?: StatsStore;
+  voice?: Speaker;
   /** Reports MCP server health for the dashboard. */
   mcpStatus?: () => McpStatus[] | Promise<McpStatus[]>;
   corsOrigin?: string;
@@ -51,6 +60,7 @@ export function createApp({
   handoffs = new HandoffStore(),
   delegates = {},
   stats = new StatsStore(),
+  voice,
   mcpStatus = defaultMcpStatus,
   corsOrigin = "*",
 }: AppDeps) {
@@ -80,6 +90,30 @@ export function createApp({
   }
 
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  // Spoken replies. Small cache so replaying a message doesn't re-synthesize it.
+  const audioCache = new Map<string, Buffer>();
+  app.get("/api/voice", (c) =>
+    c.json({ enabled: !!voice?.available(), voice: voice?.voiceName ?? null, setup: voice?.available() ? null : "Run pnpm voice:setup, then restart Jarvis" }),
+  );
+  app.post("/api/speak", async (c) => {
+    if (!voice?.available()) return c.json({ error: "Voice isn't set up. Run pnpm voice:setup, then restart Jarvis." }, 503);
+    const body = (await c.req.json().catch(() => null)) as { text?: unknown } | null;
+    if (typeof body?.text !== "string" || !body.text.trim()) return c.json({ error: "text is required" }, 400);
+    const text = speakable(body.text);
+    if (!text) return c.json({ error: "Nothing to say" }, 400);
+    try {
+      let wav = audioCache.get(text);
+      if (!wav) {
+        wav = await voice.synthesize(text);
+        audioCache.set(text, wav);
+        if (audioCache.size > 50) audioCache.delete(audioCache.keys().next().value as string);
+      }
+      return new Response(new Uint8Array(wav), { headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store" } });
+    } catch (err) {
+      return c.json({ error: errorMessage(err) }, 500);
+    }
+  });
 
   /** Dashboard numbers: usage per model, hourly traffic, handoff history, MCP health. */
   app.get("/api/stats", async (c) => {

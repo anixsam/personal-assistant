@@ -1,56 +1,71 @@
 "use client";
 
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, Loader2, Square, Volume2 } from "lucide-react";
+import { Reactor } from "@/components/hud/reactor";
 import type { Handoff, UiMessage } from "@/lib/types";
 import { HandoffCard } from "./handoff-card";
 import { Markdown } from "./markdown";
 
+/** Small Jarvis mark used in lists and headers. */
 export function JarvisMark({ size = 28 }: { size?: number }) {
-  return (
-    <div
-      className="relative grid shrink-0 place-items-center rounded-full border border-accent/50 bg-panel shadow-[0_0_18px_rgb(63_208_255/0.25)]"
-      style={{ width: size, height: size }}
-      aria-hidden
-    >
-      <div className="rounded-full bg-accent shadow-[0_0_10px_var(--color-accent)]" style={{ width: size * 0.32, height: size * 0.32 }} />
-    </div>
-  );
+  return <Reactor size={size} />;
 }
 
 function Typing() {
   return (
-    <div className="flex h-6 items-center gap-1" aria-label="Jarvis is thinking">
-      {[0, 150, 300].map((d) => (
-        <span key={d} className="typing-dot h-1.5 w-1.5 rounded-full bg-accent" style={{ animationDelay: `${d}ms` }} />
-      ))}
+    <div className="relative flex h-6 w-40 items-center overflow-hidden" aria-label="Jarvis is thinking">
+      <span className="font-hud text-xs text-accent/80">Processing</span>
+      <span className="hud-sweep absolute inset-x-0 bottom-0 h-px bg-accent/20" />
     </div>
   );
 }
 
-export function Message({ message, onHandoffChange }: { message: UiMessage; onHandoffChange: (h: Handoff) => void }) {
+export interface SpeakControls {
+  available: boolean;
+  activeId: string | null;
+  state: "idle" | "loading" | "speaking";
+  level: number;
+  onSpeak: (m: UiMessage) => void;
+  onStop: () => void;
+}
+
+export function Message({ message, onHandoffChange, voice }: { message: UiMessage; onHandoffChange: (h: Handoff) => void; voice: SpeakControls }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-panel-2 px-4 py-2.5 text-[15px] whitespace-pre-wrap border border-line">
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm border border-accent/25 bg-accent/[0.07] px-4 py-2.5 text-[15px] whitespace-pre-wrap">
           {message.content}
         </div>
       </div>
     );
   }
   const empty = !message.content && !message.handoff && !message.error;
+  const mine = voice.activeId === message.id;
+  const coreState = mine && voice.state === "speaking" ? "speaking" : message.streaming ? "thinking" : "idle";
   return (
     <div className="flex gap-3">
-      <JarvisMark />
-      <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+      <Reactor size={30} state={coreState} level={mine ? voice.level : 0} className="mt-0.5" />
+      <div className="hud-panel min-w-0 flex-1 space-y-2 rounded-md px-4 py-3">
+        <div className="font-hud flex items-center gap-2 text-[11px] text-accent/80">
+          <span>Jarvis</span>
+          {message.model && !message.streaming && <span className="truncate text-muted/70 normal-case tracking-normal">· {message.model}</span>}
+          {voice.available && message.content && !message.streaming && (
+            <button
+              className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted hover:bg-accent/10 hover:text-accent"
+              onClick={() => (mine ? voice.onStop() : voice.onSpeak(message))}
+              aria-label={mine ? "Stop speaking" : "Read aloud"}
+            >
+              {mine && voice.state === "loading" ? <Loader2 size={13} className="animate-spin" /> : mine ? <Square size={12} /> : <Volume2 size={13} />}
+              <span className="font-hud text-[10px]">{mine ? "Stop" : "Speak"}</span>
+            </button>
+          )}
+        </div>
         {empty && message.streaming ? <Typing /> : message.content && <Markdown>{message.content}</Markdown>}
         {message.handoff && <HandoffCard handoff={message.handoff} onChange={onHandoffChange} />}
         {message.error && (
           <p className="flex items-start gap-1.5 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-sm text-bad">
             <CircleAlert size={15} className="mt-0.5 shrink-0" /> {message.error}
           </p>
-        )}
-        {message.model && !message.streaming && (
-          <div className="text-[11px] tracking-wide text-muted/80 uppercase">{message.model}</div>
         )}
       </div>
     </div>

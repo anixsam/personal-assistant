@@ -23,6 +23,9 @@ importers:
       '@jarvis/router':
         specifier: workspace:*
         version: link:../../packages/router
+      '@jarvis/voice':
+        specifier: workspace:*
+        version: link:../../packages/voice
       hono:
         specifier: ^4.13.16
         version: 4.13.16
@@ -116,7 +119,11 @@ importers:
 
   packages/shared: {}
 
-  packages/voice: {}
+  packages/voice:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
 
 packages:
 
