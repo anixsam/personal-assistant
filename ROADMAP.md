@@ -12,7 +12,7 @@ same commit that completes the task.
 - [x] 7. `mcp/filesystem`: MCP server for scoped read/write of a workspace folder
 - [x] 8. `mcp/github`: MCP server for repos, issues and PRs (uses `GITHUB_TOKEN`)
 - [ ] 9. `mcp/claude-code`: MCP server that hands coding tasks to Claude Code (headless `claude -p`) and reports progress
-- [ ] 10. Wire the MCP servers into the tool loop, plus a `.mcp.json` for using them from Claude Code directly
+- [ ] 10. Wire the MCP servers into the tool loop, plus a `.mcp.json` for using them from Claude Code directly. Each server is optional and only starts when configured (GitHub only with `GITHUB_TOKEN`), so Jarvis runs fine without them and you can connect them later; the dashboard shows which are on
 - [ ] 11. `packages/voice`: Piper TTS wrapper using a British male voice (`en_GB-alan-medium`), with a voice-download script
 - [ ] 12. Voice replies in the UI: speak assistant responses, mute toggle, playback controls
 - [ ] 13. Voice input (speech recognition): push-to-talk mic button in the UI, speech-to-text via NVIDIA NIM ASR (Parakeet) with local whisper.cpp as offline fallback, transcript sent as a chat message
