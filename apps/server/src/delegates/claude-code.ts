@@ -19,11 +19,13 @@ export class ClaudeCodeDelegate implements Delegate {
   constructor(private readonly opts: ClaudeCodeOptions, private readonly spawner: Spawner = spawn) {}
 
   run(handoff: Handoff, signal?: AbortSignal): Promise<DelegateResult> {
-    const args = ["-p", handoff.task, "--output-format", "json", "--permission-mode", this.opts.permissionMode ?? "acceptEdits"];
+    const args = ["-p", "--output-format", "json", "--permission-mode", this.opts.permissionMode ?? "acceptEdits"];
     return new Promise((resolve, reject) => {
       const child = this.spawner(this.opts.bin ?? "claude", args, {
         cwd: this.opts.cwd,
-        stdio: ["ignore", "pipe", "pipe"],
+        // The task goes in on stdin: with the Windows shell below, an argument would be split on
+        // spaces and could be read as shell syntax.
+        stdio: ["pipe", "pipe", "pipe"],
         signal,
         timeout: this.opts.timeoutMs ?? 30 * 60_000,
         // On Windows the claude CLI is a .cmd shim, which needs a shell to start.
@@ -34,6 +36,7 @@ export class ClaudeCodeDelegate implements Delegate {
       child.stdout?.on("data", (d) => (stdout += d));
       child.stderr?.on("data", (d) => (stderr += d));
       child.on("error", reject);
+      child.stdin?.end(handoff.task);
       child.on("close", (code) => {
         if (code !== 0) return reject(new Error(`claude exited with ${code}: ${stderr.trim().slice(-500)}`));
         try {

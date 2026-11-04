@@ -32,6 +32,7 @@ function fakeSpawn(stdout, code = 0, seen = []) {
     const child = new EventEmitter();
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
+    child.stdin = { end: (t) => seen.at(-1) && (seen.at(-1).stdin = t) };
     setImmediate(() => {
       child.stdout.emit("data", stdout);
       if (code) child.stderr.emit("data", "boom");
@@ -48,7 +49,8 @@ test("ClaudeCodeDelegate runs claude -p in the workspace and parses JSON", async
   assert.equal(r.output, "Done, tests pass.");
   assert.equal(r.costUsd, 0.42);
   assert.equal(seen[0].bin, "claude");
-  assert.deepEqual(seen[0].args.slice(0, 4), ["-p", "Write a haiku", "--output-format", "json"]);
+  assert.deepEqual(seen[0].args.slice(0, 3), ["-p", "--output-format", "json"]);
+  assert.equal(seen[0].stdin, "Write a haiku", "task is sent on stdin, never through the shell");
   assert.equal(seen[0].opts.cwd, "/repo");
 });
 
