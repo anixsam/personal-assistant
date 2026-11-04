@@ -83,7 +83,7 @@ export default function ChatPage() {
       await streamChat(
         history,
         {
-          onRoute: ({ model }) => patch({ model }),
+          onRoute: ({ model, tools }) => patch({ model, ...(tools && { tools }) }),
           onDelta: (t) => {
             answer += t;
             patch((m) => ({ content: m.content + t }));

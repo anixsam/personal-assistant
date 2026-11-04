@@ -41,8 +41,21 @@ export interface NimChatResult {
 /** Targets NIM may hand work off to. Every handoff needs the user's approval. */
 export type DelegateTarget = "claude" | "claude-code";
 
+/** A tool call Friday made while answering (shown in the UI and dashboard). */
+export interface ToolUse {
+  name: string;
+  ok: boolean;
+}
+
+/** Extra tools NIM may call directly while answering (e.g. MCP servers). Read-only or user-configured. */
+export interface Toolbox {
+  tools(): NimTool[] | Promise<NimTool[]>;
+  /** Runs a tool and returns its text result. Throwing reports the error back to NIM. */
+  call(name: string, argsJson: string, signal?: AbortSignal): Promise<string>;
+}
+
 export type RouteResult =
-  | { kind: "answer"; content: string; model: string; usage?: NimUsage }
+  | { kind: "answer"; content: string; model: string; usage?: NimUsage; tools?: ToolUse[] }
   | {
       kind: "delegate";
       target: DelegateTarget;
@@ -52,4 +65,5 @@ export type RouteResult =
       requiresApproval: true;
       model: string;
       usage?: NimUsage;
+      tools?: ToolUse[];
     };

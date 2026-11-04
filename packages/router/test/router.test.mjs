@@ -68,3 +68,47 @@ test("the assistant persona is Friday", async () => {
   assert.match(FRIDAY_SYSTEM_PROMPT, /^You are Friday/);
   assert.equal(JARVIS_SYSTEM_PROMPT, FRIDAY_SYSTEM_PROMPT);
 });
+
+function seqFetch(payloads, seen = []) {
+  let i = 0;
+  return async (url, init) => {
+    seen.push(JSON.parse(init.body));
+    return new Response(JSON.stringify(payloads[Math.min(i++, payloads.length - 1)]), { status: 200 });
+  };
+}
+const toolCall = (name, args, id = "c1") => ({ model: "m", usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }, choices: [{ message: { role: "assistant", content: null, tool_calls: [{ id, type: "function", function: { name, arguments: JSON.stringify(args) } }] }, finish_reason: "tool_calls" }] });
+const answer = (text) => ({ model: "m", usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 }, choices: [{ message: { role: "assistant", content: text }, finish_reason: "stop" }] });
+const readTool = { type: "function", function: { name: "filesystem__read_file", description: "read", parameters: { type: "object", properties: {} } } };
+
+test("router runs toolbox tools in a loop and answers with the results", async () => {
+  const seen = [];
+  const calls = [];
+  const toolbox = { tools: () => [readTool], call: async (name, args) => (calls.push([name, JSON.parse(args)]), "Buy milk") };
+  const nim = new NimClient(config, seqFetch([toolCall("filesystem__read_file", { path: "todo.txt" }), answer("Your list says: buy milk, boss.")], seen));
+  const r = await new JarvisRouter(nim, { toolbox }).route([{ role: "user", content: "What's on my todo list?" }]);
+  assert.equal(r.kind, "answer");
+  assert.equal(r.content, "Your list says: buy milk, boss.");
+  assert.deepEqual(r.tools, [{ name: "filesystem__read_file", ok: true }]);
+  assert.equal(r.usage.total_tokens, 40, "usage summed over rounds");
+  assert.deepEqual(calls, [["filesystem__read_file", { path: "todo.txt" }]]);
+  assert.deepEqual(seen[0].tools.map((t) => t.function.name), ["delegate", "filesystem__read_file"]);
+  const second = seen[1].messages;
+  assert.equal(second.at(-2).tool_calls[0].function.name, "filesystem__read_file");
+  assert.deepEqual(second.at(-1), { role: "tool", tool_call_id: "c1", content: "Buy milk" });
+});
+
+test("router reports tool errors to NIM, stops after max rounds, and still delegates", async () => {
+  const seen = [];
+  const toolbox = { tools: () => [readTool], call: async () => { throw new Error("denied"); } };
+  const nim = new NimClient(config, seqFetch([toolCall("filesystem__read_file", {}), toolCall("filesystem__read_file", {}), answer("Sorry boss, I couldn't read it.")], seen));
+  const r = await new JarvisRouter(nim, { toolbox, maxToolRounds: 1 }).route([{ role: "user", content: "read it" }]);
+  assert.equal(r.kind, "answer");
+  assert.deepEqual(r.tools, [{ name: "filesystem__read_file", ok: false }]);
+  assert.equal(seen[1].messages.at(-1).content, "Error: denied");
+  assert.deepEqual(seen[1].tools.map((t) => t.function.name), ["delegate"], "last round only offers delegate");
+
+  const nim2 = new NimClient(config, seqFetch([toolCall("delegate", { target: "claude-code", task: "Fix it", reason: "repo work" })]));
+  const d = await new JarvisRouter(nim2, { toolbox }).route([{ role: "user", content: "fix my repo" }]);
+  assert.equal(d.kind, "delegate");
+  assert.equal(d.requiresApproval, true);
+});

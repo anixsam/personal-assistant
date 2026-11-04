@@ -46,6 +46,18 @@ export function Message({ message, onHandoffChange, voice }: { message: UiMessag
     <div className="flex gap-3">
       <Reactor size={30} state={coreState} level={mine ? voice.level : 0} className="mt-0.5" />
       <div className="hud-panel min-w-0 flex-1 space-y-2 rounded-md px-4 py-3">
+        {message.tools?.length ? (
+          <div className="flex flex-wrap gap-1.5" aria-label="Tools used">
+            {message.tools.map((t, i) => (
+              <span
+                key={i}
+                className={`rounded border px-1.5 py-0.5 font-mono text-[10px] ${t.ok ? "border-accent/30 text-accent/80" : "border-bad/40 text-bad"}`}
+              >
+                {t.name.replace("__", " · ")}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div className="font-hud flex items-center gap-2 text-[11px] text-accent/80">
           <span>Friday</span>
           {message.model && !message.streaming && <span className="truncate text-muted/70 normal-case tracking-normal">· {message.model}</span>}

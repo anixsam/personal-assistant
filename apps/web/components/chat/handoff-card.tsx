@@ -87,6 +87,15 @@ export function HandoffCard({ handoff, onChange }: { handoff: Handoff; onChange:
             <CircleAlert size={14} /> {error}
           </p>
         )}
+        {handoff.status === "running" && handoff.progress?.length ? (
+          <ul className="space-y-0.5 font-mono text-[11px] text-muted" aria-label="Progress">
+            {handoff.progress.map((p, i) => (
+              <li key={i} className={i === handoff.progress!.length - 1 ? "text-fg" : undefined}>
+                {p}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {handoff.status === "failed" && handoff.error && (
           <p className="flex items-center gap-1.5 text-bad">
             <CircleAlert size={14} /> {handoff.error}

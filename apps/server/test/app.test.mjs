@@ -151,3 +151,11 @@ test("voices: list, preview with another voice, select", async () => {
   await post(app, "/api/speak", { text: "hello" });
   assert.deepEqual(used, ["b", "b"]);
 });
+
+test("chat passes through the tools Friday used", async () => {
+  const router = { route: async () => ({ kind: "answer", content: "Buy milk, boss.", model: "nemo", tools: [{ name: "filesystem__read_file", ok: true }] }) };
+  const app = createApp({ router });
+  assert.deepEqual((await (await post(app, "/api/chat", user)).json()).tools, [{ name: "filesystem__read_file", ok: true }]);
+  const text = await (await post(app, "/api/chat/stream", user)).text();
+  assert.match(text, /event: route\ndata: .*"tools":\[\{"name":"filesystem__read_file","ok":true\}\]/);
+});

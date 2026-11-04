@@ -2,7 +2,7 @@ import { SseParser } from "./sse";
 import type { Handoff } from "./types";
 
 export interface StreamHandlers {
-  onRoute?: (info: { model: string; kind: "answer" | "handoff" }) => void;
+  onRoute?: (info: { model: string; kind: "answer" | "handoff"; tools?: { name: string; ok: boolean }[] }) => void;
   onDelta?: (text: string) => void;
   onHandoff?: (handoff: Handoff) => void;
   onError?: (message: string) => void;

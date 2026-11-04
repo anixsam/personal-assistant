@@ -26,6 +26,9 @@ importers:
       '@jarvis/voice':
         specifier: workspace:*
         version: link:../../packages/voice
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@3.25.76)
       hono:
         specifier: ^4.13.16
         version: 4.13.16

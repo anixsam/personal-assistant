@@ -40,7 +40,7 @@ const MAX_MESSAGES = 100;
 const MAX_CHARS = 32_000;
 
 type ChatReply =
-  | { kind: "answer"; content: string; model: string }
+  | { kind: "answer"; content: string; model: string; tools?: { name: string; ok: boolean }[] }
   | { kind: "handoff"; handoff: Handoff; model: string };
 
 export function parseMessages(body: unknown): NimMessage[] | string {
@@ -89,7 +89,7 @@ export function createApp({
       tokens: result.usage?.total_tokens ?? 0,
       ok: true,
     });
-    if (result.kind === "answer") return { kind: "answer", content: result.content, model: result.model };
+    if (result.kind === "answer") return { kind: "answer", content: result.content, model: result.model, ...(result.tools && { tools: result.tools }) };
     const handoff = handoffs.create({ target: result.target, task: result.task, reason: result.reason });
     return { kind: "handoff", handoff, model: result.model };
   }
@@ -166,7 +166,7 @@ export function createApp({
     return streamSSE(c, async (stream) => {
       try {
         const r = await reply(messages, c.req.raw.signal);
-        await stream.writeSSE({ event: "route", data: JSON.stringify({ model: r.model, kind: r.kind }) });
+        await stream.writeSSE({ event: "route", data: JSON.stringify({ model: r.model, kind: r.kind, ...(r.kind === "answer" && r.tools && { tools: r.tools }) }) });
         if (r.kind === "answer") {
           for (const piece of chunk(r.content)) await stream.writeSSE({ event: "delta", data: JSON.stringify({ text: piece }) });
         } else {
@@ -201,7 +201,7 @@ export function createApp({
     if (!h) return c.json({ error: "handoff was already decided" }, 409);
     handoffs.update(id, { status: "running" });
     void delegate
-      .run(h)
+      .run(h, undefined, (steps) => handoffs.update(id, { progress: steps.slice(-6) }))
       .then((r) => handoffs.update(id, { status: "completed", result: r.output, by: r.by, costUsd: r.costUsd, finishedAt: new Date().toISOString() }))
       .catch((err) => handoffs.update(id, { status: "failed", error: errorMessage(err), finishedAt: new Date().toISOString() }));
     return c.json({ handoff: handoffs.get(id) }, 202);

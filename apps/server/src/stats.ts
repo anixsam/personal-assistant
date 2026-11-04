@@ -119,9 +119,9 @@ export class StatsStore {
   }
 }
 
-/** MCP servers Friday will use. They're wired in later roadmap tasks, so for now they report not-configured. */
+/** MCP servers Friday knows about. Used when the server runs without an MCP hub (tests). */
 export const PLANNED_MCP_SERVERS = ["filesystem", "github", "claude-code"] as const;
 
 export function defaultMcpStatus(): McpStatus[] {
-  return PLANNED_MCP_SERVERS.map((name) => ({ name, status: "not-configured", detail: "Added in a later build step" }));
+  return PLANNED_MCP_SERVERS.map((name) => ({ name, status: "not-configured", detail: "Not configured" }));
 }

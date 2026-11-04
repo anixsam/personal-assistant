@@ -109,8 +109,11 @@ export function McpHealth({ servers }: { servers: Stats["mcp"] }) {
         return (
           <li key={m.name} className="flex items-center gap-3 rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm">
             <Icon size={16} className={t.tone} />
-            <span className="font-mono text-xs">{m.name}</span>
-            <span className={cn("ml-auto text-xs", t.tone)}>{t.label}</span>
+            <div className="min-w-0">
+              <div className="font-mono text-xs">{m.name}</div>
+              {m.detail && <div className="truncate text-[11px] text-muted">{m.detail}</div>}
+            </div>
+            <span className={cn("ml-auto shrink-0 text-xs", t.tone)}>{t.label}</span>
           </li>
         );
       })}

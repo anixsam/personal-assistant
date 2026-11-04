@@ -15,6 +15,8 @@ export interface Handoff {
   by?: string;
   costUsd?: number;
   error?: string;
+  /** Latest steps while Claude Code works. */
+  progress?: string[];
 }
 
 export interface UiMessage {
@@ -24,6 +26,8 @@ export interface UiMessage {
   createdAt: string;
   /** Model that answered (assistant only). */
   model?: string;
+  /** Tools Friday used to answer, e.g. "filesystem__read_file". */
+  tools?: { name: string; ok: boolean }[];
   /** Present when NIM proposed handing this request off. */
   handoff?: Handoff;
   error?: string;

@@ -18,6 +18,8 @@ export interface Handoff {
   by?: string;
   costUsd?: number;
   error?: string;
+  /** Latest steps while running (Claude Code via MCP): files edited, commands run. */
+  progress?: string[];
 }
 
 export const HANDOFF_STATUSES: readonly HandoffStatus[] = ["pending", "approved", "rejected", "running", "completed", "failed"];

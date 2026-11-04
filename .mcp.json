@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "friday-filesystem": {
+      "command": "node",
+      "args": ["mcp/filesystem/dist/index.js", "${JARVIS_FS_ROOT:-.}"],
+      "env": { "JARVIS_FS_READONLY": "${JARVIS_FS_READONLY:-1}" }
+    },
+    "friday-github": {
+      "command": "node",
+      "args": ["mcp/github/dist/index.js"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "JARVIS_GITHUB_REPOS": "${JARVIS_GITHUB_REPOS:-}",
+        "JARVIS_GITHUB_READONLY": "${JARVIS_GITHUB_READONLY:-1}"
+      }
+    }
+  }
+}
