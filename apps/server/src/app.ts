@@ -19,6 +19,13 @@ export interface Speaker {
   select?(id: string): void;
 }
 
+/** Speech-to-text for voice input (NIM ASR, then local whisper.cpp). */
+export interface Listener {
+  available(): boolean;
+  engineNames(): string[];
+  transcribe(wav: Buffer, signal?: AbortSignal): Promise<{ text: string; engine: string }>;
+}
+
 /** The part of JarvisRouter the server needs (lets tests pass a fake). */
 export interface ChatRouter {
   route(history: NimMessage[], signal?: AbortSignal): Promise<RouteResult>;
@@ -31,6 +38,7 @@ export interface AppDeps {
   delegates?: Delegates;
   stats?: StatsStore;
   voice?: Speaker;
+  stt?: Listener;
   /** Reports MCP server health for the dashboard. */
   mcpStatus?: () => McpStatus[] | Promise<McpStatus[]>;
   corsOrigin?: string;
@@ -38,6 +46,8 @@ export interface AppDeps {
 
 const MAX_MESSAGES = 100;
 const MAX_CHARS = 32_000;
+/** About two minutes of 16 kHz mono 16-bit audio. */
+const MAX_AUDIO_BYTES = 4_000_000;
 
 type ChatReply =
   | { kind: "answer"; content: string; model: string; tools?: { name: string; ok: boolean }[] }
@@ -66,6 +76,7 @@ export function createApp({
   delegates = {},
   stats = new StatsStore(),
   voice,
+  stt,
   mcpStatus = defaultMcpStatus,
   corsOrigin = "*",
 }: AppDeps) {
@@ -99,7 +110,12 @@ export function createApp({
   // Spoken replies. Small cache so replaying a message doesn't re-synthesize it.
   const audioCache = new Map<string, Buffer>();
   app.get("/api/voice", (c) =>
-    c.json({ enabled: !!voice?.available(), voice: voice?.voiceName ?? null, setup: voice?.available() ? null : "Run pnpm voice:setup, then restart Friday" }),
+    c.json({
+      enabled: !!voice?.available(),
+      voice: voice?.voiceName ?? null,
+      setup: voice?.available() ? null : "Run pnpm voice:setup, then restart Friday",
+      stt: { enabled: !!stt?.available(), engines: stt?.engineNames() ?? [], setup: stt?.available() ? null : "Run pnpm voice:setup --stt, then restart Friday" },
+    }),
   );
   app.post("/api/speak", async (c) => {
     if (!voice?.available()) return c.json({ error: "Voice isn't set up. Run pnpm voice:setup, then restart Friday." }, 503);
@@ -120,6 +136,19 @@ export function createApp({
       return new Response(new Uint8Array(wav), { headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store" } });
     } catch (err) {
       return c.json({ error: errorMessage(err) }, 500);
+    }
+  });
+
+  /** Voice input: a WAV recording in, the transcript out. */
+  app.post("/api/transcribe", async (c) => {
+    if (!stt?.available()) return c.json({ error: "Voice input isn't set up. Run pnpm voice:setup --stt, then restart Friday." }, 503);
+    const wav = Buffer.from(await c.req.arrayBuffer());
+    if (wav.length < 44 || wav.subarray(0, 4).toString("ascii") !== "RIFF") return c.json({ error: "Send a WAV recording" }, 400);
+    if (wav.length > MAX_AUDIO_BYTES) return c.json({ error: "Recording is too long (max about 2 minutes)" }, 413);
+    try {
+      return c.json(await stt.transcribe(wav, c.req.raw.signal));
+    } catch (err) {
+      return c.json({ error: errorMessage(err) }, 502);
     }
   });
 

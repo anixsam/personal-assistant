@@ -118,7 +118,9 @@ test("voice: status, 503 when not set up, WAV when set up, cached", async () => 
   const said = [];
   const voice = { voiceName: "en_GB-alan-medium", available: () => true, synthesize: async (t) => { calls++; said.push(t); return Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(40)]); } };
   const app = createApp({ router: answerRouter, voice });
-  assert.deepEqual(await (await app.request("/api/voice")).json(), { enabled: true, voice: "en_GB-alan-medium", setup: null });
+  const status = await (await app.request("/api/voice")).json();
+  assert.deepEqual({ ...status, stt: undefined }, { enabled: true, voice: "en_GB-alan-medium", setup: null, stt: undefined });
+  assert.equal(status.stt.enabled, false);
   const res = await post(app, "/api/speak", { text: "**Good evening**, sir." });
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-type"), "audio/wav");
@@ -158,4 +160,19 @@ test("chat passes through the tools Friday used", async () => {
   assert.deepEqual((await (await post(app, "/api/chat", user)).json()).tools, [{ name: "filesystem__read_file", ok: true }]);
   const text = await (await post(app, "/api/chat/stream", user)).text();
   assert.match(text, /event: route\ndata: .*"tools":\[\{"name":"filesystem__read_file","ok":true\}\]/);
+});
+
+test("transcribe: 503 without STT, 400 for non-WAV, transcript with engine", async () => {
+  const wav = Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(60)]);
+  const send = (app, body) => app.request("/api/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body });
+  assert.equal((await send(createApp({ router: answerRouter }), wav)).status, 503);
+  const got = [];
+  const stt = { available: () => true, engineNames: () => ["whisper"], transcribe: async (b) => (got.push(b.length), { text: "Hello Friday", engine: "whisper" }) };
+  const app = createApp({ router: answerRouter, stt });
+  assert.equal((await send(app, Buffer.from("not audio at all, really"))).status, 400);
+  assert.deepEqual(await (await send(app, wav)).json(), { text: "Hello Friday", engine: "whisper" });
+  assert.deepEqual(got, [64]);
+  assert.deepEqual((await (await app.request("/api/voice")).json()).stt, { enabled: true, engines: ["whisper"], setup: null });
+  const failing = createApp({ router: answerRouter, stt: { ...stt, transcribe: async () => { throw new Error("whisper: crashed"); } } });
+  assert.equal((await send(failing, wav)).status, 502);
 });

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AudioLines, Menu, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
+import { MicRecorder } from "@/lib/recorder";
 import { Message, type SpeakControls } from "@/components/chat/message";
 import { Sidebar } from "@/components/chat/sidebar";
 import { HudClock, greeting } from "@/components/hud/clock";
@@ -229,7 +230,12 @@ export default function ChatPage() {
 
         <div className="mx-auto w-full max-w-3xl px-4 pb-4 md:px-6">
           {voiceError && <p className="mb-2 text-center text-xs text-warn">{voiceError}</p>}
-          <Composer busy={busy} onSend={send} onStop={() => abortRef.current?.abort()} />
+          <Composer
+            busy={busy}
+            onSend={send}
+            onStop={() => abortRef.current?.abort()}
+            mic={voice.canListen && MicRecorder.supported() ? { onError: setVoiceError } : undefined}
+          />
           <p className="font-hud mt-2 text-center text-[10px] text-muted/60">Enter to send · Shift+Enter for a new line</p>
         </div>
       </main>

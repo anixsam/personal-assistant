@@ -9,6 +9,7 @@ const FX_KEY = "jarvis.voice.fx";
 /** Voice availability (from the server), mute preference and live playback state. */
 export function useVoice() {
   const [available, setAvailable] = useState(false);
+  const [canListen, setCanListen] = useState(false);
   const [muted, setMutedState] = useState(false);
   const [fx, setFxState] = useState(false);
   const [play, setPlay] = useState<{ state: VoiceState; messageId: string | null; level: number }>({ state: "idle", messageId: null, level: 0 });
@@ -24,7 +25,10 @@ export function useVoice() {
     }
     fetch("/api/voice")
       .then((r) => r.json())
-      .then((v: { enabled?: boolean }) => setAvailable(!!v.enabled))
+      .then((v: { enabled?: boolean; stt?: { enabled?: boolean } }) => {
+        setAvailable(!!v.enabled);
+        setCanListen(!!v.stt?.enabled);
+      })
       .catch(() => setAvailable(false));
     return voicePlayer.subscribe(setPlay);
   }, []);
@@ -49,5 +53,5 @@ export function useVoice() {
     }
   };
 
-  return { available, muted, setMuted, fx, setFx, ...play };
+  return { available, canListen, muted, setMuted, fx, setFx, ...play };
 }

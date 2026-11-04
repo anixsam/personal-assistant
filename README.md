@@ -31,6 +31,20 @@ pnpm dev               # server on :8787, chat UI on http://localhost:3000
 
 Needs Node 22+ and pnpm 10 (`npm i -g pnpm@10.28.0`; on Windows, pnpm 11+ can fail to switch to the pinned version).
 
+## Talking to Friday
+
+Hold the mic button next to the message box (or Ctrl+Space) and speak; let go to send. A quick tap
+toggles instead: tap to start, tap again to send. The recording is turned into text on your machine
+with [whisper.cpp](https://github.com/ggml-org/whisper.cpp), and sent as a normal message.
+
+```bash
+pnpm voice:setup --stt    # Windows: downloads whisper.cpp + the base English model into ./voices
+```
+
+On macOS or Linux, install whisper.cpp yourself (`brew install whisper-cpp` on macOS) and set `WHISPER_BIN`.
+If you run an NVIDIA Speech NIM (Parakeet), set `NIM_ASR_URL` to its `/v1/audio/transcriptions` endpoint
+and Friday tries it first, falling back to whisper.cpp. The mic button only shows when one of them is set up.
+
 ## Tools (MCP servers)
 
 Friday can use three optional MCP servers. Each one starts only when you configure it in `.env`, so

@@ -3,8 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MicButton } from "./mic-button";
 
-export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (text: string) => void; onStop: () => void }) {
+export function Composer({
+  busy,
+  onSend,
+  onStop,
+  mic,
+}: {
+  busy: boolean;
+  onSend: (text: string) => void;
+  onStop: () => void;
+  /** Voice input; omitted when speech-to-text isn't set up on the server. */
+  mic?: { onError: (message: string) => void };
+}) {
+  const [listening, setListening] = useState(false);
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -43,10 +56,11 @@ export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (tex
             submit();
           }
         }}
-        placeholder="What can I do for you, boss?"
+        placeholder={listening ? "Listening…" : "What can I do for you, boss?"}
         aria-label="Message Friday"
         className="scroll-thin max-h-[220px] min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-muted/60"
       />
+      {mic && !busy && <MicButton onTranscript={onSend} onError={mic.onError} onListening={setListening} />}
       {busy ? (
         <Button type="button" variant="outline" size="icon" onClick={onStop} aria-label="Stop">
           <Square size={14} />

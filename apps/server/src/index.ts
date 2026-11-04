@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { VoiceLibrary, defaultVoicePaths } from "@jarvis/voice";
+import { NimAsr, SpeechToText, VoiceLibrary, WhisperCpp, defaultVoicePaths, defaultWhisperPaths } from "@jarvis/voice";
 import { serve } from "@hono/node-server";
 import { JarvisRouter, NimClient, loadNimConfig } from "@jarvis/router";
 import { createApp } from "./app.js";
@@ -61,8 +61,16 @@ const voice = new VoiceLibrary({
 });
 if (!voice.available()) console.warn("Voice not set up: run `pnpm voice:setup` for spoken replies.");
 
+// Voice input: NIM ASR (Parakeet) when NIM_ASR_URL is set, then local whisper.cpp from `pnpm voice:setup --stt`.
+const whisper = defaultWhisperPaths(repoRoot, env.WHISPER_MODEL || undefined);
+const stt = new SpeechToText([
+  new NimAsr({ url: env.NIM_ASR_URL ?? "", apiKey: env.NIM_ASR_API_KEY || env.NVIDIA_API_KEY, language: env.STT_LANGUAGE || "en-US" }),
+  new WhisperCpp({ bin: env.WHISPER_BIN || whisper.bin, model: env.WHISPER_MODEL_PATH || whisper.model, language: (env.STT_LANGUAGE || "en").slice(0, 2) }),
+]);
+if (!stt.available()) console.warn("Voice input not set up: run `pnpm voice:setup --stt` (or set NIM_ASR_URL).");
+
 const port = Number(env.PORT) || 8787;
-const app = createApp({ router, delegates, voice, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
+const app = createApp({ router, delegates, voice, stt, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
 
 serve({ fetch: app.fetch, port, hostname: env.HOST || "127.0.0.1" }, (info) => {
   console.log(`Friday server listening on http://${info.address}:${info.port}`);
