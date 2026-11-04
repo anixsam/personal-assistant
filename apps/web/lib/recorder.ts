@@ -106,9 +106,50 @@ export class MicRecorder {
   }
 }
 
-export async function transcribe(wav: ArrayBuffer): Promise<{ text: string; engine: string }> {
-  const res = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav });
-  const body = (await res.json().catch(() => ({}))) as { text?: string; engine?: string; error?: string };
+const UNLOCK_KEY = "friday.voiceid.unlock";
+
+export function getUnlock(): string | null {
+  try {
+    return sessionStorage.getItem(UNLOCK_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setUnlock(token: string | null) {
+  try {
+    if (token) sessionStorage.setItem(UNLOCK_KEY, token);
+    else sessionStorage.removeItem(UNLOCK_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Thrown when voice ID didn't recognise the speaker. */
+export class AccessDeniedError extends Error {
+  constructor(readonly pinAvailable: boolean, readonly score?: number) {
+    super("Access denied");
+    this.name = "AccessDeniedError";
+  }
+}
+
+export async function transcribe(wav: ArrayBuffer): Promise<{ text: string; engine: string; speaker?: { name: string | null; via: string } }> {
+  const unlock = getUnlock();
+  const res = await fetch("/api/transcribe", {
+    method: "POST",
+    headers: { "Content-Type": "audio/wav", ...(unlock && { "x-friday-unlock": unlock }) },
+    body: wav,
+  });
+  const body = (await res.json().catch(() => ({}))) as { text?: string; engine?: string; error?: string; denied?: boolean; pinAvailable?: boolean; score?: number; speaker?: { name: string | null; via: string } };
+  if (res.status === 403 && body.denied) throw new AccessDeniedError(!!body.pinAvailable, body.score);
   if (!res.ok) throw new Error(body.error || `Voice input failed (${res.status})`);
-  return { text: (body.text ?? "").trim(), engine: body.engine ?? "" };
+  return { text: (body.text ?? "").trim(), engine: body.engine ?? "", speaker: body.speaker };
+}
+
+/** Records a clip and returns its WAV (for voice ID enrollment), or null if it was too short. */
+export async function recordFor(ms: number, onLevel?: (l: number) => void): Promise<ArrayBuffer | null> {
+  const r = new MicRecorder();
+  await r.start(onLevel);
+  await new Promise((res) => setTimeout(res, ms));
+  return r.stop();
 }

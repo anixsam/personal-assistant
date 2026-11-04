@@ -6,3 +6,4 @@ dist/
 !.env.example
 *.onnx
 voices/
+data/

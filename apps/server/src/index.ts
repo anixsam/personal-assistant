@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { NimAsr, SpeechToText, VoiceLibrary, WhisperCpp, defaultVoicePaths, defaultWhisperPaths } from "@jarvis/voice";
 import { serve } from "@hono/node-server";
 import { JarvisRouter, NimClient, loadNimConfig } from "@jarvis/router";
+import { DEFAULT_VOICEID_MODEL, OnnxSpeakerEmbedder, VoiceprintStore } from "@jarvis/voiceid";
 import { createApp } from "./app.js";
 import { ClaudeDelegate } from "./delegates/claude.js";
 import { ClaudeCodeDelegate } from "./delegates/claude-code.js";
@@ -69,8 +70,15 @@ const stt = new SpeechToText([
 ]);
 if (!stt.available()) console.warn("Voice input not set up: run `pnpm voice:setup --stt` (or set NIM_ASR_URL).");
 
+// Voice ID: speaker embeddings computed locally; voiceprints (not recordings) saved in data/voiceprints.json.
+const voiceId = new VoiceprintStore(
+  env.VOICEID_STORE || resolve(repoRoot, "data", "voiceprints.json"),
+  new OnnxSpeakerEmbedder(env.VOICEID_MODEL || resolve(repoRoot, "voices", DEFAULT_VOICEID_MODEL.file)),
+);
+if (!voiceId.available()) console.warn("Voice ID not set up: run `pnpm voice:setup --voiceid` to recognise your voice.");
+
 const port = Number(env.PORT) || 8787;
-const app = createApp({ router, delegates, voice, stt, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
+const app = createApp({ router, delegates, voice, stt, voiceId, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
 
 serve({ fetch: app.fetch, port, hostname: env.HOST || "127.0.0.1" }, (info) => {
   console.log(`Friday server listening on http://${info.address}:${info.port}`);

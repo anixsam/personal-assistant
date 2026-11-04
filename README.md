@@ -45,6 +45,16 @@ On macOS or Linux, install whisper.cpp yourself (`brew install whisper-cpp` on m
 If you run an NVIDIA Speech NIM (Parakeet), set `NIM_ASR_URL` to its `/v1/audio/transcriptions` endpoint
 and Friday tries it first, falling back to whisper.cpp. The mic button only shows when one of them is set up.
 
+## Voice ID
+
+Friday can answer only your voice. Run `pnpm voice:setup --voiceid` to download a small speaker model
+(WeSpeaker CAM++, runs locally with onnxruntime, nothing leaves your machine), then open
+Dashboard → Voice ID and read the three phrases to enroll. From then on every voice message is checked
+first: your voice goes through, anyone else gets **ACCESS DENIED**. You can tune the match threshold,
+test your voice, re-enroll, turn it off, and set a 4 to 8 digit PIN. The PIN unlocks voice input for
+15 minutes when your voice isn't recognized (a cold, a noisy room) and is needed to change Voice ID
+settings. Voiceprints and the access log are kept in `data/voiceprints.json` (gitignored).
+
 ## Tools (MCP servers)
 
 Friday can use three optional MCP servers. Each one starts only when you configure it in `.env`, so

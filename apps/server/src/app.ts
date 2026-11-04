@@ -6,6 +6,8 @@ import { HandoffStore, HANDOFF_STATUSES, type Handoff } from "./handoffs.js";
 import type { Delegates } from "./delegates/types.js";
 import { StatsStore, defaultMcpStatus, type McpStatus } from "./stats.js";
 import { speakable } from "@jarvis/voice";
+import type { VoiceprintStore } from "@jarvis/voiceid";
+import { UnlockTokens, checkSpeaker, registerVoiceIdRoutes } from "./voiceid.js";
 
 /** Text-to-speech used for spoken replies (Piper in production, a fake in tests). */
 export interface Speaker {
@@ -39,6 +41,8 @@ export interface AppDeps {
   stats?: StatsStore;
   voice?: Speaker;
   stt?: Listener;
+  /** Voice ID: when enabled, spoken requests from unrecognised voices get "Access denied". */
+  voiceId?: VoiceprintStore;
   /** Reports MCP server health for the dashboard. */
   mcpStatus?: () => McpStatus[] | Promise<McpStatus[]>;
   corsOrigin?: string;
@@ -77,6 +81,7 @@ export function createApp({
   stats = new StatsStore(),
   voice,
   stt,
+  voiceId,
   mcpStatus = defaultMcpStatus,
   corsOrigin = "*",
 }: AppDeps) {
@@ -145,12 +150,18 @@ export function createApp({
     const wav = Buffer.from(await c.req.arrayBuffer());
     if (wav.length < 44 || wav.subarray(0, 4).toString("ascii") !== "RIFF") return c.json({ error: "Send a WAV recording" }, 400);
     if (wav.length > MAX_AUDIO_BYTES) return c.json({ error: "Recording is too long (max about 2 minutes)" }, 413);
+    const who = await checkSpeaker(voiceId, unlockTokens, wav, c.req.header("x-friday-unlock"));
+    if (!who.ok) return c.json(who.body, who.status);
     try {
-      return c.json(await stt.transcribe(wav, c.req.raw.signal));
+      const r = await stt.transcribe(wav, c.req.raw.signal);
+      return c.json({ ...r, ...(who.via !== "off" && { speaker: { name: who.name ?? null, score: who.score ?? null, via: who.via } }) });
     } catch (err) {
       return c.json({ error: errorMessage(err) }, 502);
     }
   });
+
+  const unlockTokens = new UnlockTokens();
+  registerVoiceIdRoutes(app, voiceId, unlockTokens);
 
   /** Voice picker: installed voices and the one in use. */
   app.get("/api/voices", (c) =>

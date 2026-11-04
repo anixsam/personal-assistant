@@ -3,6 +3,7 @@
 // into ./voices. Run once: pnpm voice:setup
 // Extra stock voices: pnpm voice:setup en_GB-northern_english_male-medium en_GB-cori-high
 // Voice input (speech-to-text with whisper.cpp): pnpm voice:setup --stt
+// Voice identification (speaker model for "Access denied"): pnpm voice:setup --voiceid
 import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { Readable } from "node:stream";
@@ -14,6 +15,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dir = path.join(root, "voices");
 const args = process.argv.slice(2);
 const wantStt = args.includes("--stt");
+const wantVoiceId = args.includes("--voiceid");
 const named = args.filter((a) => !a.startsWith("--"));
 const voices = named.length ? named : [process.env.PIPER_VOICE || "en_GB-northern_english_male-medium"];
 const PIPER = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/";
@@ -85,6 +87,15 @@ if (wantStt) {
     console.log("  https://github.com/ggml-org/whisper.cpp) and set WHISPER_BIN to the whisper-cli path in .env.");
   }
   await download(`https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${sttModel}`, path.join(dir, sttModel));
+}
+
+// 4. Voice identification (optional): a local speaker-embedding model (WeSpeaker CAM++, ~28 MB).
+if (wantVoiceId) {
+  console.log("Voice identification (CAM++ speaker model):");
+  await download(
+    "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_CAM++.onnx",
+    path.join(dir, "wespeaker_en_voxceleb_CAM++.onnx"),
+  );
 }
 
 console.log(`\nDone. Voice files are in ${dir}. Set PIPER_VOICE in .env to pick one, then restart Friday (pnpm dev).`);

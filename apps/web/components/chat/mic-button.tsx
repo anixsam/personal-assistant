@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic } from "lucide-react";
-import { MicRecorder, transcribe } from "@/lib/recorder";
+import { AccessDeniedError, MicRecorder, transcribe } from "@/lib/recorder";
 import { cn } from "@/lib/utils";
 
 type MicState = "idle" | "listening" | "transcribing";
@@ -16,8 +16,11 @@ export function MicButton({
   onTranscript,
   onError,
   onListening,
+  onDenied,
 }: {
   disabled?: boolean;
+  /** Voice ID didn't recognise the speaker. */
+  onDenied?: (pinAvailable: boolean) => void;
   onTranscript: (text: string) => void;
   onError: (message: string) => void;
   onListening?: (on: boolean) => void;
@@ -56,7 +59,8 @@ export function MicButton({
       if (text) onTranscript(text);
       else onError("I didn't catch that, boss. Try again?");
     } catch (e) {
-      onError(e instanceof Error ? e.message : "Voice input failed");
+      if (e instanceof AccessDeniedError && onDenied) onDenied(e.pinAvailable);
+      else onError(e instanceof Error ? e.message : "Voice input failed");
     } finally {
       setState("idle");
     }

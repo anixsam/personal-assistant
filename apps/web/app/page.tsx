@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AudioLines, Menu, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { MicRecorder } from "@/lib/recorder";
+import { AccessDenied } from "@/components/chat/access-denied";
 import { Message, type SpeakControls } from "@/components/chat/message";
 import { Sidebar } from "@/components/chat/sidebar";
 import { HudClock, greeting } from "@/components/hud/clock";
@@ -37,6 +38,7 @@ export default function ChatPage() {
   const [online, setOnline] = useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [denied, setDenied] = useState<{ pinAvailable: boolean } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [hello, setHello] = useState("Good evening, boss.");
@@ -229,12 +231,23 @@ export default function ChatPage() {
         </div>
 
         <div className="mx-auto w-full max-w-3xl px-4 pb-4 md:px-6">
+          {denied && <AccessDenied pinAvailable={denied.pinAvailable} onClose={() => setDenied(null)} />}
           {voiceError && <p className="mb-2 text-center text-xs text-warn">{voiceError}</p>}
           <Composer
             busy={busy}
             onSend={send}
             onStop={() => abortRef.current?.abort()}
-            mic={voice.canListen && MicRecorder.supported() ? { onError: setVoiceError } : undefined}
+            mic={
+              voice.canListen && MicRecorder.supported()
+                ? {
+                    onError: setVoiceError,
+                    onDenied: (pinAvailable) => {
+                      setDenied({ pinAvailable });
+                      if (voice.available && !voice.muted) voicePlayer.speak("Access denied.").catch(() => undefined);
+                    },
+                  }
+                : undefined
+            }
           />
           <p className="font-hud mt-2 text-center text-[10px] text-muted/60">Enter to send · Shift+Enter for a new line</p>
         </div>

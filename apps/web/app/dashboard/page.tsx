@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { HourlyChart } from "@/components/dashboard/hourly-chart";
 import { VoicePicker } from "@/components/dashboard/voice-picker";
+import { VoiceIdPanel } from "@/components/dashboard/voice-id";
 import { HandoffHistory, McpHealth, ModelTable, Panel, RecentConversations, StatTile } from "@/components/dashboard/panels";
 import { JarvisMark } from "@/components/chat/message";
 import { getStats } from "@/lib/api";
@@ -85,6 +86,12 @@ export default function DashboardPage() {
             <RecentConversations conversations={conversations} />
           </Panel>
         </div>
+
+        <section id="voiceid" className="scroll-mt-20">
+          <Panel title="Voice ID">
+            <VoiceIdPanel />
+          </Panel>
+        </section>
 
         <section id="voice" className="scroll-mt-20">
           <Panel title="Friday's voice">

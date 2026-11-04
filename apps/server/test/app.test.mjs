@@ -176,3 +176,34 @@ test("transcribe: 503 without STT, 400 for non-WAV, transcript with engine", asy
   const failing = createApp({ router: answerRouter, stt: { ...stt, transcribe: async () => { throw new Error("whisper: crashed"); } } });
   assert.equal((await send(failing, wav)).status, 502);
 });
+
+test("voice ID: denies unknown voices, PIN unlocks, settings need the PIN", async () => {
+  const { VoiceprintStore, decodeWav, normalize } = await import("@jarvis/voiceid");
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  // Fake embedder: the "voice" is the first sample's sign/size, enough to tell two speakers apart.
+  const embedder = { available: () => true, embed: async (w) => { const s = decodeWav(w).samples; return normalize(Float32Array.from([s[100] > 0 ? 1 : -1, 0.1])); } };
+  const store = new VoiceprintStore(path.join(mkdtempSync(path.join(tmpdir(), "vid-")), "v.json"), embedder);
+  const tone = (sign) => { const n = 16000 * 2; const b = Buffer.alloc(44 + n * 2); b.write("RIFF", 0); b.write("WAVE", 8); b.write("fmt ", 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(16000, 24); b.writeUInt32LE(32000, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write("data", 36); b.writeUInt32LE(n * 2, 40); for (let i = 0; i < n; i++) b.writeInt16LE(sign * 9000, 44 + i * 2); return b; };
+  const stt = { available: () => true, engineNames: () => ["whisper"], transcribe: async () => ({ text: "Hello Friday", engine: "whisper" }) };
+  const app = createApp({ router: answerRouter, stt, voiceId: store });
+  const send = (url, body, headers = {}) => app.request(url, { method: "POST", headers: { "Content-Type": "audio/wav", ...headers }, body });
+  for (let i = 0; i < 3; i++) assert.equal((await send("/api/voiceid/enroll?user=owner&name=Anix", tone(1))).status, 200);
+  assert.equal((await (await app.request("/api/voiceid")).json()).enabled, true);
+  const mine = await (await send("/api/transcribe", tone(1))).json();
+  assert.equal(mine.speaker.name, "Anix");
+  const other = await send("/api/transcribe", tone(-1));
+  assert.equal(other.status, 403);
+  assert.equal((await other.json()).error, "Access denied");
+  const put = (body, headers = {}) => app.request("/api/voiceid/settings", { method: "PUT", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+  assert.equal((await put({ pin: "2468" })).status, 200);
+  assert.equal((await put({ threshold: 0.9 })).status, 401, "PIN now required");
+  assert.equal((await put({ threshold: 0.9 }, { "x-friday-pin": "2468" })).status, 200);
+  const pin = (p) => app.request("/api/voiceid/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: p }) });
+  assert.equal((await pin("0000")).status, 401);
+  const { unlock } = await (await pin("2468")).json();
+  assert.equal((await send("/api/transcribe", tone(-1), { "x-friday-unlock": unlock })).status, 200);
+  const log = (await (await app.request("/api/voiceid")).json()).recent.map((e) => e.outcome);
+  assert.deepEqual(log.slice(0, 4), ["pin", "denied", "denied", "accepted"]);
+});

@@ -15,7 +15,7 @@ export function Composer({
   onSend: (text: string) => void;
   onStop: () => void;
   /** Voice input; omitted when speech-to-text isn't set up on the server. */
-  mic?: { onError: (message: string) => void };
+  mic?: { onError: (message: string) => void; onDenied?: (pinAvailable: boolean) => void };
 }) {
   const [listening, setListening] = useState(false);
   const [text, setText] = useState("");
@@ -60,7 +60,7 @@ export function Composer({
         aria-label="Message Friday"
         className="scroll-thin max-h-[220px] min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-muted/60"
       />
-      {mic && !busy && <MicButton onTranscript={onSend} onError={mic.onError} onListening={setListening} />}
+      {mic && !busy && <MicButton onTranscript={onSend} onError={mic.onError} onDenied={mic.onDenied} onListening={setListening} />}
       {busy ? (
         <Button type="button" variant="outline" size="icon" onClick={onStop} aria-label="Stop">
           <Square size={14} />
