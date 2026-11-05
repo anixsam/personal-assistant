@@ -42,6 +42,16 @@ export interface RouterOptions {
   maxTokens?: number;
 }
 
+/** Per-request limits and context, set from the speaker's role. */
+export interface RouteOptions {
+  /** Who Friday is talking to; added to the system prompt so replies are per user. */
+  user?: { name: string; role: string };
+  /** Let NIM call toolbox (MCP) tools. Default true. */
+  tools?: boolean;
+  /** Let NIM propose Claude / Claude Code handoffs. Default true. */
+  delegate?: boolean;
+}
+
 /**
  * Sends every request to NVIDIA NIM first. NIM either answers directly or proposes a
  * handoff to Claude / Claude Code, which the caller must get approved before running.
@@ -49,9 +59,10 @@ export interface RouterOptions {
 export class JarvisRouter {
   constructor(private readonly nim: NimClient, private readonly opts: RouterOptions = {}) {}
 
-  async route(history: NimMessage[], signal?: AbortSignal): Promise<RouteResult> {
-    const extra = (await this.opts.toolbox?.tools()) ?? [];
-    const messages = this.withSystem(history);
+  async route(history: NimMessage[], signal?: AbortSignal, ro: RouteOptions = {}): Promise<RouteResult> {
+    const extra = ro.tools === false ? [] : ((await this.opts.toolbox?.tools()) ?? []);
+    const base = ro.delegate === false ? [] : [DELEGATE_TOOL];
+    const messages = this.withSystem(history, ro.user);
     const used: ToolUse[] = [];
     const usage: NimUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
     let sawUsage = false;
@@ -59,8 +70,8 @@ export class JarvisRouter {
 
     for (let round = 0; ; round++) {
       // After the last allowed round, ask for a plain answer (only delegate stays available).
-      const tools = round < maxRounds ? [DELEGATE_TOOL, ...extra] : [DELEGATE_TOOL];
-      const result = await this.nim.chat(messages, { tools, temperature: this.opts.temperature, maxTokens: this.opts.maxTokens, signal });
+      const tools = round < maxRounds ? [...base, ...extra] : base;
+      const result = await this.nim.chat(messages, { tools: tools.length ? tools : undefined, temperature: this.opts.temperature, maxTokens: this.opts.maxTokens, signal });
       if (result.usage) {
         sawUsage = true;
         usage.prompt_tokens += result.usage.prompt_tokens;
@@ -70,7 +81,7 @@ export class JarvisRouter {
       const meta = { model: result.model, usage: sawUsage ? { ...usage } : undefined, ...(used.length && { tools: used }) };
       const calls = result.message.tool_calls ?? [];
 
-      const delegate = calls.find((c) => c.function.name === "delegate");
+      const delegate = base.length ? calls.find((c) => c.function.name === "delegate") : undefined;
       if (delegate) {
         const parsed = parseDelegateArgs(delegate.function.arguments);
         if (parsed) return { kind: "delegate", ...parsed, requiresApproval: true, ...meta };
@@ -106,9 +117,19 @@ export class JarvisRouter {
     });
   }
 
-  private withSystem(history: NimMessage[]): NimMessage[] {
+  private withSystem(history: NimMessage[], user?: RouteOptions["user"]): NimMessage[] {
     const rest = history.filter((m) => m.role !== "system");
-    return [{ role: "system", content: this.opts.systemPrompt ?? FRIDAY_SYSTEM_PROMPT }, ...rest];
+    let content = this.opts.systemPrompt ?? FRIDAY_SYSTEM_PROMPT;
+    if (user) {
+      const limits =
+        user.role === "guest"
+          ? " They are a guest: chat only, no tools and no handoffs. If they ask for more, say an admin can give them access."
+          : user.role === "member"
+            ? " They are a member: they can use tools and request handoffs, but an admin approves handoffs."
+            : "";
+      content += `\n\nYou are talking with ${user.name.replace(/[\r\n]/g, " ")} (${user.role}). Address them by name, not "boss", unless they are the owner.${limits}`;
+    }
+    return [{ role: "system", content }, ...rest];
   }
 }
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, Mic, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
-import { MicRecorder, getUnlock, recordFor } from "@/lib/recorder";
+import { MicRecorder, authHeaders, recordFor } from "@/lib/recorder";
 import { fmtAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -23,15 +23,64 @@ const PHRASES = [
 ];
 const CLIP_MS = 4000;
 
+/** Reads three phrases and saves them as one person's voiceprint. */
+export function EnrollVoice({ userId, headers, onDone, onCancel }: { userId: string; headers: () => Record<string, string>; onDone: (consistency: number) => void; onCancel: () => void }) {
+  const [step, setStep] = useState(0);
+  const [recording, setRecording] = useState(false);
+  const [level, setLevel] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  async function record() {
+    setError(null);
+    setRecording(true);
+    try {
+      const wav = await recordFor(CLIP_MS, setLevel);
+      if (!wav) throw new Error("That was too short. Try again.");
+      const res = await fetch(`/api/voiceid/enroll?user=${encodeURIComponent(userId)}`, { method: "POST", headers: { "Content-Type": "audio/wav", ...headers() }, body: wav });
+      const r = (await res.json().catch(() => ({}))) as { done?: boolean; consistency?: number; error?: string };
+      if (!res.ok) throw new Error(r.error || `Failed (${res.status})`);
+      if (r.done) onDone(r.consistency ?? 0);
+      else setStep((n) => n + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Recording failed");
+    } finally {
+      setRecording(false);
+      setLevel(0);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs text-muted">
+        Phrase {step + 1} of {PHRASES.length}. Press Record and read it out normally (about 4 seconds).
+      </div>
+      <div className="hud-panel rounded-md px-3 py-2 text-sm">“{PHRASES[step]}”</div>
+      <div className="flex items-center gap-2">
+        <button
+          disabled={recording}
+          onClick={record}
+          className={cn("inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs", recording ? "border-accent bg-accent/20 text-accent" : "border-accent/40 text-accent hover:bg-accent/10")}
+        >
+          {recording ? <Loader2 size={13} className="animate-spin" /> : <Mic size={13} />}
+          {recording ? "Recording…" : "Record"}
+        </button>
+        {recording && <span className="h-1.5 w-24 overflow-hidden rounded bg-line"><span className="block h-full bg-accent" style={{ width: `${Math.round(level * 100)}%` }} /></span>}
+        <button onClick={onCancel} className="ml-auto text-xs text-muted hover:text-fg">
+          Cancel
+        </button>
+      </div>
+      {error && <p className="text-xs text-bad">{error}</p>}
+    </div>
+  );
+}
+
 /** Owner voiceprint enrollment, on/off, match threshold, PIN fallback and the recent access log. */
-export function VoiceIdPanel() {
+export function VoiceIdPanel({ authPin, setAuthPin, version = 0 }: { authPin: string; setAuthPin: (p: string) => void; version?: number }) {
   const [s, setS] = useState<VoiceIdState | null>(null);
-  const [name, setName] = useState("Anix");
-  const [step, setStep] = useState<number | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
   const [recording, setRecording] = useState(false);
   const [level, setLevel] = useState(0);
   const [pin, setPin] = useState("");
-  const [authPin, setAuthPin] = useState("");
   const [msg, setMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -45,45 +94,15 @@ export function VoiceIdPanel() {
     void load();
     const t = setInterval(load, 10_000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, version]);
 
-  const auth = (): Record<string, string> => {
-    const h: Record<string, string> = {};
-    const u = getUnlock();
-    if (u) h["x-friday-unlock"] = u;
-    if (authPin) h["x-friday-pin"] = authPin;
-    return h;
-  };
+  const auth = () => authHeaders(authPin);
 
   async function call(url: string, init: RequestInit) {
     const res = await fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), ...auth() } });
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) throw new Error((body.error as string) || `Failed (${res.status})`);
     return body;
-  }
-
-  async function recordPhrase(i: number) {
-    setMsg(null);
-    setRecording(true);
-    try {
-      const wav = await recordFor(CLIP_MS, setLevel);
-      if (!wav) throw new Error("That was too short. Try again.");
-      const r = (await call(`/api/voiceid/enroll?user=owner&name=${encodeURIComponent(name || "Owner")}`, {
-        method: "POST",
-        headers: { "Content-Type": "audio/wav" },
-        body: wav,
-      })) as { done: boolean; consistency?: number };
-      if (r.done) {
-        setStep(null);
-        setMsg({ tone: "ok", text: `Voice saved. Voice ID is on. Match consistency ${Math.round((r.consistency ?? 0) * 100)}%.` });
-        await load();
-      } else setStep(i + 1);
-    } catch (e) {
-      setMsg({ tone: "bad", text: e instanceof Error ? e.message : "Recording failed" });
-    } finally {
-      setRecording(false);
-      setLevel(0);
-    }
   }
 
   async function test() {
@@ -161,7 +180,7 @@ export function VoiceIdPanel() {
 
       <div className="rounded-lg border border-line p-3">
         <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-          {owner ? `${owner.name}'s voice` : "Enroll your voice"}
+          {owner ? `${owner.name}'s voice (owner)` : "Enroll your voice (owner)"}
           {owner && <span className="text-xs font-normal text-muted">saved {fmtAgo(owner.enrolledAt)}</span>}
           {owner && (
             <button onClick={() => remove("owner")} aria-label="Remove voiceprint" className="ml-auto text-muted hover:text-bad">
@@ -169,43 +188,29 @@ export function VoiceIdPanel() {
             </button>
           )}
         </div>
-        {step === null ? (
+        {enrolling ? (
+          <EnrollVoice
+            userId="owner"
+            headers={auth}
+            onCancel={() => setEnrolling(false)}
+            onDone={(c) => {
+              setEnrolling(false);
+              setMsg({ tone: "ok", text: `Voice saved. Voice ID is on. Match consistency ${Math.round(c * 100)}%.` });
+              void load();
+            }}
+          />
+        ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              aria-label="Your name"
-              className="w-32 rounded border border-line bg-bg px-2 py-1 text-sm outline-none focus:border-accent/60"
-            />
-            <button disabled={!canMic} onClick={() => setStep(0)} className="rounded-md border border-accent/40 px-3 py-1 text-xs text-accent hover:bg-accent/10 disabled:opacity-50">
+            <button disabled={!canMic} onClick={() => setEnrolling(true)} className="rounded-md border border-accent/40 px-3 py-1 text-xs text-accent hover:bg-accent/10 disabled:opacity-50">
               {owner ? "Re-enroll" : "Start"} (3 short phrases)
             </button>
-            {owner && (
+            {!!s.prints?.length && (
               <button disabled={recording || !canMic} onClick={test} className="rounded-md border border-line px-3 py-1 text-xs text-muted hover:text-fg disabled:opacity-50">
                 {recording ? "Listening…" : "Test my voice"}
               </button>
             )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-xs text-muted">
-              Phrase {step + 1} of {PHRASES.length}. Press Record and read it out normally (about 4 seconds).
-            </div>
-            <div className="hud-panel rounded-md px-3 py-2 text-sm">“{PHRASES[step]}”</div>
-            <div className="flex items-center gap-2">
-              <button
-                disabled={recording}
-                onClick={() => recordPhrase(step)}
-                className={cn("inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs", recording ? "border-accent bg-accent/20 text-accent" : "border-accent/40 text-accent hover:bg-accent/10")}
-              >
-                {recording ? <Loader2 size={13} className="animate-spin" /> : <Mic size={13} />}
-                {recording ? "Recording…" : "Record"}
-              </button>
-              {recording && <span className="h-1.5 w-24 overflow-hidden rounded bg-line"><span className="block h-full bg-accent" style={{ width: `${Math.round(level * 100)}%` }} /></span>}
-              <button onClick={() => setStep(null)} className="ml-auto text-xs text-muted hover:text-fg">
-                Cancel
-              </button>
-            </div>
+            {recording && <span className="h-1.5 w-24 overflow-hidden rounded bg-line"><span className="block h-full bg-accent" style={{ width: `${Math.round(level * 100)}%` }} /></span>}
+            <span className="text-xs text-muted">Other people enroll on the Users panel.</span>
           </div>
         )}
       </div>

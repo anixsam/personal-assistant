@@ -6,6 +6,7 @@ import { ArrowLeft, RefreshCw } from "lucide-react";
 import { HourlyChart } from "@/components/dashboard/hourly-chart";
 import { VoicePicker } from "@/components/dashboard/voice-picker";
 import { VoiceIdPanel } from "@/components/dashboard/voice-id";
+import { UsersPanel } from "@/components/dashboard/users";
 import { HandoffHistory, McpHealth, ModelTable, Panel, RecentConversations, StatTile } from "@/components/dashboard/panels";
 import { JarvisMark } from "@/components/chat/message";
 import { getStats } from "@/lib/api";
@@ -17,6 +18,9 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  // PIN typed on the Voice ID panel, also used for user changes when a PIN is set.
+  const [authPin, setAuthPin] = useState("");
+  const [usersVersion, setUsersVersion] = useState(0);
 
   async function refresh() {
     try {
@@ -87,11 +91,18 @@ export default function DashboardPage() {
           </Panel>
         </div>
 
-        <section id="voiceid" className="scroll-mt-20">
-          <Panel title="Voice ID">
-            <VoiceIdPanel />
-          </Panel>
-        </section>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <section id="users" className="scroll-mt-20">
+            <Panel title="Users and roles">
+              <UsersPanel authPin={authPin} onChange={() => setUsersVersion((v) => v + 1)} />
+            </Panel>
+          </section>
+          <section id="voiceid" className="scroll-mt-20">
+            <Panel title="Voice ID">
+              <VoiceIdPanel authPin={authPin} setAuthPin={setAuthPin} version={usersVersion} />
+            </Panel>
+          </section>
+        </div>
 
         <section id="voice" className="scroll-mt-20">
           <Panel title="Friday's voice">

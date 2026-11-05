@@ -1,5 +1,6 @@
 import { SseParser } from "./sse";
 import type { Handoff } from "./types";
+import { authHeaders } from "./recorder";
 
 export interface StreamHandlers {
   onRoute?: (info: { model: string; kind: "answer" | "handoff"; tools?: { name: string; ok: boolean }[] }) => void;
@@ -14,7 +15,7 @@ type WireMessage = { role: "user" | "assistant"; content: string };
 export async function streamChat(messages: WireMessage[], handlers: StreamHandlers, signal?: AbortSignal): Promise<void> {
   const res = await fetch("/api/chat/stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ messages }),
     signal,
   });
@@ -45,7 +46,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export async function decideHandoff(id: string, action: "approve" | "reject"): Promise<Handoff> {
-  const res = await fetch(`/api/handoffs/${id}/${action}`, { method: "POST" });
+  const res = await fetch(`/api/handoffs/${id}/${action}`, { method: "POST", headers: authHeaders() });
   return (await json<{ handoff: Handoff }>(res)).handoff;
 }
 
@@ -63,4 +64,20 @@ export async function health(): Promise<boolean> {
 
 export async function getStats(hours = 24): Promise<import("./types").Stats> {
   return json(await fetch(`/api/stats?hours=${hours}`));
+}
+
+export interface Me {
+  userId: string;
+  name: string;
+  role: "guest" | "member" | "admin" | "owner";
+  via: "open" | "voice" | "pin" | "keyboard";
+  can: { tools: boolean; approve: boolean; manageUsers: boolean };
+}
+
+export async function getMe(): Promise<Me | null> {
+  try {
+    return await json<Me>(await fetch("/api/me", { headers: authHeaders() }));
+  } catch {
+    return null;
+  }
 }

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp, parseMessages, chunk } from "../dist/app.js";
+import { UserStore } from "../dist/users.js";
 
 const answerRouter = { route: async () => ({ kind: "answer", content: "At your service, sir.", model: "nemo" }) };
 const handoffRouter = {
@@ -187,7 +188,7 @@ test("voice ID: denies unknown voices, PIN unlocks, settings need the PIN", asyn
   const store = new VoiceprintStore(path.join(mkdtempSync(path.join(tmpdir(), "vid-")), "v.json"), embedder);
   const tone = (sign) => { const n = 16000 * 2; const b = Buffer.alloc(44 + n * 2); b.write("RIFF", 0); b.write("WAVE", 8); b.write("fmt ", 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(16000, 24); b.writeUInt32LE(32000, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write("data", 36); b.writeUInt32LE(n * 2, 40); for (let i = 0; i < n; i++) b.writeInt16LE(sign * 9000, 44 + i * 2); return b; };
   const stt = { available: () => true, engineNames: () => ["whisper"], transcribe: async () => ({ text: "Hello Friday", engine: "whisper" }) };
-  const app = createApp({ router: answerRouter, stt, voiceId: store });
+  const app = createApp({ router: answerRouter, stt, voiceId: store, users: new UserStore(undefined, "Anix") });
   const send = (url, body, headers = {}) => app.request(url, { method: "POST", headers: { "Content-Type": "audio/wav", ...headers }, body });
   for (let i = 0; i < 3; i++) assert.equal((await send("/api/voiceid/enroll?user=owner&name=Anix", tone(1))).status, 200);
   assert.equal((await (await app.request("/api/voiceid")).json()).enabled, true);
@@ -206,4 +207,69 @@ test("voice ID: denies unknown voices, PIN unlocks, settings need the PIN", asyn
   assert.equal((await send("/api/transcribe", tone(-1), { "x-friday-unlock": unlock })).status, 200);
   const log = (await (await app.request("/api/voiceid")).json()).recent.map((e) => e.outcome);
   assert.deepEqual(log.slice(0, 4), ["pin", "denied", "denied", "accepted"]);
+});
+
+test("users and roles: per-user voices, guests chat only, only admins approve or manage users", async () => {
+  const { VoiceprintStore, decodeWav, normalize } = await import("@jarvis/voiceid");
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  // Fake embedder: each loudness level is a different "voice".
+  const embedder = { available: () => true, embed: async (w) => { const v = new Float32Array(10); v[Math.round(Math.abs(decodeWav(w).samples[100]) * 10)] = 1; return normalize(v); } };
+  const store = new VoiceprintStore(path.join(mkdtempSync(path.join(tmpdir(), "vid-")), "v.json"), embedder);
+  const tone = (amp) => { const n = 32000; const b = Buffer.alloc(44 + n * 2); b.write("RIFF", 0); b.write("WAVE", 8); b.write("fmt ", 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(16000, 24); b.writeUInt32LE(32000, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write("data", 36); b.writeUInt32LE(n * 2, 40); for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(amp * 32767), 44 + i * 2); return b; };
+  const seen = [];
+  let mode = "answer";
+  const router = { route: async (_h, _s, opts) => (seen.push(opts), mode === "answer" ? { kind: "answer", content: "hi", model: "nemo" } : { kind: "delegate", target: "claude-code", task: "Fix it", reason: "code", requiresApproval: true, model: "nemo" }) };
+  const ran = [];
+  const delegates = { "claude-code": { run: async (h) => (ran.push(h.id), { output: "done", by: "claude-code" }) } };
+  const stt = { available: () => true, engineNames: () => ["whisper"], transcribe: async () => ({ text: "hello", engine: "whisper" }) };
+  const users = new UserStore(undefined, "Anix");
+  const app = createApp({ router, delegates, stt, voiceId: store, users });
+  const req = (method, url, body, session) =>
+    app.request(url, { method, headers: { "Content-Type": "application/json", ...(session && { "x-friday-unlock": session }) }, ...(body !== undefined && { body: JSON.stringify(body) }) });
+  const wavPost = (url, wav) => app.request(url, { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav });
+
+  const ria = (await (await req("POST", "/api/users", { name: "Ria", role: "member" })).json()).user;
+  const sam = (await (await req("POST", "/api/users", { name: "Sam", role: "guest" })).json()).user;
+  assert.equal((await req("POST", "/api/users", { name: "ria", role: "guest" })).status, 400, "names are unique");
+  for (const [id, amp] of [["owner", 0.1], [ria.id, 0.3], [sam.id, 0.5]]) for (let i = 0; i < 3; i++) assert.equal((await wavPost(`/api/voiceid/enroll?user=${id}`, tone(amp))).status, 200);
+  assert.equal((await wavPost("/api/voiceid/enroll?user=nobody", tone(0.7))).status, 404);
+  const list = (await (await req("GET", "/api/users")).json()).users;
+  assert.deepEqual(list.map((u) => [u.name, u.role, u.voice]), [["Anix", "owner", true], ["Ria", "member", true], ["Sam", "guest", true]]);
+
+  // Each recognised voice gets a session; chat is answered for that person with that role's limits.
+  const samT = await (await wavPost("/api/transcribe", tone(0.5))).json();
+  assert.equal(samT.speaker.name, "Sam");
+  assert.equal(samT.speaker.role, "guest");
+  await req("POST", "/api/chat", user, samT.session);
+  assert.deepEqual(seen.at(-1), { user: { name: "Sam", role: "guest" }, tools: false, delegate: false });
+  assert.equal((await (await req("GET", "/api/me", undefined, samT.session)).json()).name, "Sam");
+  assert.equal((await req("POST", "/api/users", { name: "Eve", role: "admin" }, samT.session)).status, 403);
+  assert.equal((await wavPost("/api/transcribe", tone(0.7))).status, 403, "unknown voices are still denied");
+
+  const riaT = await (await wavPost("/api/transcribe", tone(0.3))).json();
+  mode = "handoff";
+  const { handoff } = await (await req("POST", "/api/chat", user, riaT.session)).json();
+  assert.deepEqual(seen.at(-1), { user: { name: "Ria", role: "member" }, tools: true, delegate: true });
+  assert.equal(handoff.requestedBy, "Ria");
+  assert.equal((await req("POST", `/api/handoffs/${handoff.id}/approve`, undefined, riaT.session)).status, 403, "members can't approve");
+  const ownerT = await (await wavPost("/api/transcribe", tone(0.1))).json();
+  const ok = await req("POST", `/api/handoffs/${handoff.id}/approve`, undefined, ownerT.session);
+  assert.equal(ok.status, 202);
+  assert.equal((await ok.json()).handoff.decidedBy, "Anix");
+
+  // Typed requests with no voice session use the keyboard role (owner by default).
+  assert.equal((await (await req("GET", "/api/me")).json()).role, "owner");
+  assert.equal((await req("PUT", "/api/users-keyboard", { role: "guest" }, riaT.session)).status, 403);
+  assert.equal((await req("PUT", "/api/users-keyboard", { role: "guest" })).status, 200);
+  assert.equal((await (await req("GET", "/api/me")).json()).role, "guest");
+  assert.equal((await req("GET", "/api/users")).status, 403);
+
+  // Removing a user ends their session and deletes their voiceprint. The owner can't be removed.
+  assert.equal((await req("DELETE", `/api/users/${sam.id}`, undefined, ownerT.session)).status, 200);
+  assert.equal((await (await req("GET", "/api/me", undefined, samT.session)).json()).role, "guest");
+  assert.equal(store.prints().some((p) => p.userId === sam.id), false);
+  assert.equal((await req("DELETE", "/api/users/owner", undefined, ownerT.session)).status, 400);
+  assert.equal((await req("PATCH", `/api/users/${ria.id}`, { role: "admin" }, ownerT.session)).status, 200);
 });

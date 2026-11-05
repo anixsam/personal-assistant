@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AudioLines, Menu, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { AudioLines, Menu, Sparkles, UserRound, Volume2, VolumeX } from "lucide-react";
 import { Composer } from "@/components/chat/composer";
 import { MicRecorder } from "@/lib/recorder";
 import { AccessDenied } from "@/components/chat/access-denied";
@@ -11,7 +11,7 @@ import { Sidebar } from "@/components/chat/sidebar";
 import { HudClock, greeting } from "@/components/hud/clock";
 import { Reactor, type CoreState } from "@/components/hud/reactor";
 import { Button } from "@/components/ui/button";
-import { health, streamChat } from "@/lib/api";
+import { getMe, health, streamChat, type Me } from "@/lib/api";
 import { appendMessage, toWire, updateMessage } from "@/lib/conversations";
 import type { Handoff, UiMessage } from "@/lib/types";
 import { useConversations } from "@/lib/use-conversations";
@@ -44,6 +44,19 @@ export default function ChatPage() {
   const [hello, setHello] = useState("Good evening, boss.");
 
   useEffect(() => setHello(greeting()), []);
+
+  // Who Friday thinks it's talking to (voice session, PIN unlock, or the keyboard role).
+  const [me, setMe] = useState<Me | null>(null);
+  useEffect(() => {
+    const refresh = async () => setMe(await getMe());
+    void refresh();
+    const t = setInterval(refresh, 15000);
+    window.addEventListener("friday:identity", refresh);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("friday:identity", refresh);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -162,6 +175,18 @@ export default function ChatPage() {
             </div>
           </div>
           <HudClock />
+          {me && me.via !== "open" && (
+            <Link
+              href="/dashboard#users"
+              title={`Friday is talking to ${me.name} (${me.role}${me.via === "keyboard" ? ", typed" : me.via === "pin" ? ", PIN" : ", by voice"})`}
+              className="hidden h-8 items-center gap-1.5 rounded-md border border-accent/30 px-2.5 text-muted hover:text-fg sm:inline-flex"
+            >
+              <UserRound size={15} className={me.via === "voice" ? "text-accent" : undefined} />
+              <span className="font-hud text-[11px]">
+                {me.name} · {me.role}
+              </span>
+            </Link>
+          )}
           <Link
             href="/dashboard#voice"
             title="Pick Friday's voice"

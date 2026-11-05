@@ -19,6 +19,7 @@ export function AccessDenied({ pinAvailable, onClose }: { pinAvailable: boolean;
       const body = (await res.json()) as { unlock?: string; error?: string };
       if (!res.ok || !body.unlock) throw new Error(body.error || "Wrong PIN");
       setUnlock(body.unlock);
+      window.dispatchEvent(new Event("friday:identity"));
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Wrong PIN");

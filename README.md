@@ -55,6 +55,25 @@ test your voice, re-enroll, turn it off, and set a 4 to 8 digit PIN. The PIN unl
 15 minutes when your voice isn't recognized (a cold, a noisy room) and is needed to change Voice ID
 settings. Voiceprints and the access log are kept in `data/voiceprints.json` (gitignored).
 
+## Users and roles
+
+Dashboard → Users and roles lets the owner (and admins) add people, give each a role, and enroll each
+person's voice (hand them the mic and they read three phrases). Friday answers each recognised voice by
+name, with that role's limits:
+
+| Role | Can |
+| --- | --- |
+| guest | Chat only (no tools, no handoffs) |
+| member | Chat and tasks: tools, and asking for Claude / Claude Code handoffs |
+| admin | Also approves or declines handoffs and manages members and guests |
+| owner | Everything, including making admins; can't be removed |
+
+A recognised voice starts a 15 minute session, so the typed messages and approvals that follow count as
+that person, and the chat header shows who Friday thinks it's talking to. Unknown voices still get
+**ACCESS DENIED**. Typed messages with no recognised voice count as the owner by default; the owner can
+change that to guest on the same panel. With voice ID off, everyone is the owner. Users are saved in
+`data/users.json` (gitignored).
+
 ## Tools (MCP servers)
 
 Friday can use three optional MCP servers. Each one starts only when you configure it in `.env`, so

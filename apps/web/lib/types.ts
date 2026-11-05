@@ -17,6 +17,8 @@ export interface Handoff {
   error?: string;
   /** Latest steps while Claude Code works. */
   progress?: string[];
+  requestedBy?: string;
+  decidedBy?: string;
 }
 
 export interface UiMessage {

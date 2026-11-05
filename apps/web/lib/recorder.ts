@@ -125,6 +125,15 @@ export function setUnlock(token: string | null) {
   }
 }
 
+/** Sends the voice/PIN session so typed messages and approvals count as the recognised person. */
+export function authHeaders(pin?: string): Record<string, string> {
+  const h: Record<string, string> = {};
+  const u = getUnlock();
+  if (u) h["x-friday-unlock"] = u;
+  if (pin) h["x-friday-pin"] = pin;
+  return h;
+}
+
 /** Thrown when voice ID didn't recognise the speaker. */
 export class AccessDeniedError extends Error {
   constructor(readonly pinAvailable: boolean, readonly score?: number) {
@@ -133,14 +142,18 @@ export class AccessDeniedError extends Error {
   }
 }
 
-export async function transcribe(wav: ArrayBuffer): Promise<{ text: string; engine: string; speaker?: { name: string | null; via: string } }> {
+export async function transcribe(wav: ArrayBuffer): Promise<{ text: string; engine: string; speaker?: { name: string | null; via: string; role?: string | null } }> {
   const unlock = getUnlock();
   const res = await fetch("/api/transcribe", {
     method: "POST",
     headers: { "Content-Type": "audio/wav", ...(unlock && { "x-friday-unlock": unlock }) },
     body: wav,
   });
-  const body = (await res.json().catch(() => ({}))) as { text?: string; engine?: string; error?: string; denied?: boolean; pinAvailable?: boolean; score?: number; speaker?: { name: string | null; via: string } };
+  const body = (await res.json().catch(() => ({}))) as { text?: string; engine?: string; error?: string; denied?: boolean; pinAvailable?: boolean; score?: number; speaker?: { name: string | null; via: string; role?: string | null }; session?: string };
+  if (body.session) {
+    setUnlock(body.session);
+    window.dispatchEvent(new Event("friday:identity"));
+  }
   if (res.status === 403 && body.denied) throw new AccessDeniedError(!!body.pinAvailable, body.score);
   if (!res.ok) throw new Error(body.error || `Voice input failed (${res.status})`);
   return { text: (body.text ?? "").trim(), engine: body.engine ?? "", speaker: body.speaker };

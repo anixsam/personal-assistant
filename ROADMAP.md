@@ -18,7 +18,7 @@ same commit that completes the task.
 - [x] 13. Voice replies in the UI: speak assistant responses, mute toggle, playback controls, studio FX toggle, and a voice picker on the dashboard (preview and switch between installed stock voices)
 - [x] 14. Voice input (speech recognition): push-to-talk mic button in the UI, speech-to-text via NVIDIA NIM ASR (Parakeet) with local whisper.cpp as offline fallback, transcript sent as a chat message
 - [x] 15. Voice identification: enroll the owner's voice (a few short phrases), compute a speaker embedding locally (WeSpeaker CAM++ via ONNX), and check every spoken request against it; unrecognized voices get "Access denied" and are logged on the dashboard. Adjustable match threshold, re-enroll option, and a PIN fallback
-- [ ] 16. User management on the dashboard (owner only): add, edit and remove users; each user enrolls their own voiceprint and gets a role (e.g. guest: chat only; member: chat + tasks; admin: can approve Claude/Claude Code handoffs and manage users). Requests are answered per recognized user, unknown voices still get "Access denied"
+- [x] 16. User management on the dashboard (owner only): add, edit and remove users; each user enrolls their own voiceprint and gets a role (e.g. guest: chat only; member: chat + tasks; admin: can approve Claude/Claude Code handoffs and manage users). Requests are answered per recognized user, unknown voices still get "Access denied"
 - [ ] 17. Persistence: SQLite store for conversations and dashboard metrics
 - [ ] 18. Dev experience: root `pnpm dev`, CI (typecheck + build), setup docs
 

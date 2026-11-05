@@ -5,6 +5,7 @@ import { NimAsr, SpeechToText, VoiceLibrary, WhisperCpp, defaultVoicePaths, defa
 import { serve } from "@hono/node-server";
 import { JarvisRouter, NimClient, loadNimConfig } from "@jarvis/router";
 import { DEFAULT_VOICEID_MODEL, OnnxSpeakerEmbedder, VoiceprintStore } from "@jarvis/voiceid";
+import { OWNER_ID, UserStore } from "./users.js";
 import { createApp } from "./app.js";
 import { ClaudeDelegate } from "./delegates/claude.js";
 import { ClaudeCodeDelegate } from "./delegates/claude-code.js";
@@ -77,8 +78,11 @@ const voiceId = new VoiceprintStore(
 );
 if (!voiceId.available()) console.warn("Voice ID not set up: run `pnpm voice:setup --voiceid` to recognise your voice.");
 
+// Users and roles (data/users.json). The owner is created on first run, named after the enrolled voice if any.
+const users = new UserStore(env.USERS_STORE || resolve(repoRoot, "data", "users.json"), voiceId.prints().find((p) => p.userId === OWNER_ID)?.name || env.FRIDAY_OWNER_NAME || "Owner");
+
 const port = Number(env.PORT) || 8787;
-const app = createApp({ router, delegates, voice, stt, voiceId, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
+const app = createApp({ router, delegates, voice, stt, voiceId, users, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
 
 serve({ fetch: app.fetch, port, hostname: env.HOST || "127.0.0.1" }, (info) => {
   console.log(`Friday server listening on http://${info.address}:${info.port}`);

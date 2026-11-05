@@ -112,3 +112,15 @@ test("router reports tool errors to NIM, stops after max rounds, and still deleg
   assert.equal(d.kind, "delegate");
   assert.equal(d.requiresApproval, true);
 });
+
+test("guest requests get no tools or delegate, and the system prompt names the user", async () => {
+  const seen = [];
+  const nim = { chat: async (messages, opts) => { seen.push({ messages, opts }); return { model: "m", message: { role: "assistant", content: "hi" } }; } };
+  const toolbox = { tools: async () => [{ type: "function", function: { name: "fs__read", description: "", parameters: {} } }], call: async () => "" };
+  const r = new JarvisRouter(nim, { toolbox });
+  await r.route([{ role: "user", content: "yo" }], undefined, { user: { name: "Sam", role: "guest" }, tools: false, delegate: false });
+  assert.equal(seen[0].opts.tools, undefined);
+  assert.match(seen[0].messages[0].content, /talking with Sam \(guest\)/);
+  await r.route([{ role: "user", content: "yo" }], undefined, { user: { name: "Ria", role: "member" } });
+  assert.deepEqual(seen[1].opts.tools.map((t) => t.function.name), ["delegate", "fs__read"]);
+});

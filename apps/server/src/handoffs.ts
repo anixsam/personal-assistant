@@ -20,6 +20,9 @@ export interface Handoff {
   error?: string;
   /** Latest steps while running (Claude Code via MCP): files edited, commands run. */
   progress?: string[];
+  /** Who asked (by name), and who approved or rejected it. */
+  requestedBy?: string;
+  decidedBy?: string;
 }
 
 export const HANDOFF_STATUSES: readonly HandoffStatus[] = ["pending", "approved", "rejected", "running", "completed", "failed"];
@@ -31,7 +34,7 @@ export const HANDOFF_STATUSES: readonly HandoffStatus[] = ["pending", "approved"
 export class HandoffStore {
   private readonly items = new Map<string, Handoff>();
 
-  create(input: Pick<Handoff, "target" | "task" | "reason">): Handoff {
+  create(input: Pick<Handoff, "target" | "task" | "reason" | "requestedBy">): Handoff {
     const h: Handoff = { id: randomUUID(), ...input, status: "pending", createdAt: new Date().toISOString() };
     this.items.set(h.id, h);
     return h;
@@ -46,12 +49,13 @@ export class HandoffStore {
   }
 
   /** Returns the updated handoff, undefined if missing, or null if it was already decided. */
-  decide(id: string, status: "approved" | "rejected"): Handoff | undefined | null {
+  decide(id: string, status: "approved" | "rejected", by?: string): Handoff | undefined | null {
     const h = this.items.get(id);
     if (!h) return undefined;
     if (h.status !== "pending") return null;
     h.status = status;
     h.decidedAt = new Date().toISOString();
+    if (by) h.decidedBy = by;
     return h;
   }
 

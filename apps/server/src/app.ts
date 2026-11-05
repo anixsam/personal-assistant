@@ -1,13 +1,14 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import type { NimMessage, RouteResult } from "@jarvis/router";
+import type { NimMessage, RouteOptions, RouteResult } from "@jarvis/router";
 import { HandoffStore, HANDOFF_STATUSES, type Handoff } from "./handoffs.js";
 import type { Delegates } from "./delegates/types.js";
 import { StatsStore, defaultMcpStatus, type McpStatus } from "./stats.js";
 import { speakable } from "@jarvis/voice";
-import type { VoiceprintStore } from "@jarvis/voiceid";
-import { UnlockTokens, checkSpeaker, registerVoiceIdRoutes } from "./voiceid.js";
+import { checkPin, type VoiceprintStore } from "@jarvis/voiceid";
+import { checkSpeaker, registerVoiceIdRoutes } from "./voiceid.js";
+import { ROLES, SESSION_HEADER, Sessions, UserError, UserStore, atLeast, type Identity, type Role } from "./users.js";
 
 /** Text-to-speech used for spoken replies (Piper in production, a fake in tests). */
 export interface Speaker {
@@ -30,7 +31,7 @@ export interface Listener {
 
 /** The part of JarvisRouter the server needs (lets tests pass a fake). */
 export interface ChatRouter {
-  route(history: NimMessage[], signal?: AbortSignal): Promise<RouteResult>;
+  route(history: NimMessage[], signal?: AbortSignal, opts?: RouteOptions): Promise<RouteResult>;
 }
 
 export interface AppDeps {
@@ -43,6 +44,8 @@ export interface AppDeps {
   stt?: Listener;
   /** Voice ID: when enabled, spoken requests from unrecognised voices get "Access denied". */
   voiceId?: VoiceprintStore;
+  /** Users and roles (in memory when omitted). */
+  users?: UserStore;
   /** Reports MCP server health for the dashboard. */
   mcpStatus?: () => McpStatus[] | Promise<McpStatus[]>;
   corsOrigin?: string;
@@ -82,17 +85,40 @@ export function createApp({
   voice,
   stt,
   voiceId,
+  users = new UserStore(),
   mcpStatus = defaultMcpStatus,
   corsOrigin = "*",
 }: AppDeps) {
   const app = new Hono();
   app.use("/api/*", cors({ origin: corsOrigin }));
 
-  async function reply(messages: NimMessage[], signal?: AbortSignal): Promise<ChatReply> {
+  const sessions = new Sessions();
+
+  /**
+   * Who is asking. With voice ID off, everyone is the owner (a private, local Friday). With it on, a
+   * voice or PIN session names the person; typed requests without one get the keyboard role.
+   */
+  const whoIs = (c: { req: { header(n: string): string | undefined } }): Identity => {
+    const owner = users.owner();
+    if (!voiceId?.available() || !voiceId.settings().enabled) return { userId: owner.id, name: owner.name, role: owner.role, via: "open" };
+    const held = sessions.get(c.req.header(SESSION_HEADER));
+    const u = held ? users.get(held.userId) : undefined;
+    if (u) return { userId: u.id, name: u.name, role: u.role, via: held!.via };
+    const role = users.keyboardRole();
+    return role === "owner" ? { userId: owner.id, name: owner.name, role, via: "keyboard" } : { userId: "keyboard", name: role === "guest" ? "Guest" : "Keyboard user", role, via: "keyboard" };
+  };
+
+  const routeOptions = (who: Identity): RouteOptions => ({
+    user: { name: who.name, role: who.role },
+    tools: atLeast(who.role, "member"),
+    delegate: atLeast(who.role, "member"),
+  });
+
+  async function reply(messages: NimMessage[], signal: AbortSignal | undefined, who: Identity): Promise<ChatReply> {
     const started = Date.now();
     let result: RouteResult;
     try {
-      result = await router.route(messages, signal);
+      result = await router.route(messages, signal, routeOptions(who));
     } catch (err) {
       stats.record({ at: started, model: "unknown", kind: "answer", latencyMs: Date.now() - started, tokens: 0, ok: false });
       throw err;
@@ -106,7 +132,7 @@ export function createApp({
       ok: true,
     });
     if (result.kind === "answer") return { kind: "answer", content: result.content, model: result.model, ...(result.tools && { tools: result.tools }) };
-    const handoff = handoffs.create({ target: result.target, task: result.task, reason: result.reason });
+    const handoff = handoffs.create({ target: result.target, task: result.task, reason: result.reason, requestedBy: who.name });
     return { kind: "handoff", handoff, model: result.model };
   }
 
@@ -150,18 +176,74 @@ export function createApp({
     const wav = Buffer.from(await c.req.arrayBuffer());
     if (wav.length < 44 || wav.subarray(0, 4).toString("ascii") !== "RIFF") return c.json({ error: "Send a WAV recording" }, 400);
     if (wav.length > MAX_AUDIO_BYTES) return c.json({ error: "Recording is too long (max about 2 minutes)" }, 413);
-    const who = await checkSpeaker(voiceId, unlockTokens, wav, c.req.header("x-friday-unlock"));
+    const who = await checkSpeaker(voiceId, sessions, wav, c.req.header(SESSION_HEADER), users);
     if (!who.ok) return c.json(who.body, who.status);
+    // A recognised voice starts (or refreshes) a session, so the message it sends counts as that person.
+    const session = who.via === "voice" && who.userId ? sessions.issue(who.userId) : undefined;
+    const role = who.userId ? users.get(who.userId)?.role : undefined;
     try {
       const r = await stt.transcribe(wav, c.req.raw.signal);
-      return c.json({ ...r, ...(who.via !== "off" && { speaker: { name: who.name ?? null, score: who.score ?? null, via: who.via } }) });
+      return c.json({
+        ...r,
+        ...(who.via !== "off" && { speaker: { name: who.name ?? null, score: who.score ?? null, via: who.via, role: role ?? null } }),
+        ...(session && { session }),
+      });
     } catch (err) {
       return c.json({ error: errorMessage(err) }, 502);
     }
   });
 
-  const unlockTokens = new UnlockTokens();
-  registerVoiceIdRoutes(app, voiceId, unlockTokens);
+  registerVoiceIdRoutes(app, voiceId, sessions, { users, whoIs });
+
+  // Users and roles. Admins manage members and guests; only the owner manages admins.
+  const pinOk = (c: { req: { header(n: string): string | undefined } }) => {
+    const hash = voiceId?.settings().pinHash;
+    return !hash || sessions.valid(c.req.header(SESSION_HEADER)) || checkPin(c.req.header("x-friday-pin") ?? "", hash);
+  };
+  const userView = () => {
+    const enrolled = new Set(voiceId?.prints().map((p) => p.userId) ?? []);
+    return users.list().map((u) => ({ ...u, voice: enrolled.has(u.id) }));
+  };
+  app.get("/api/me", (c) => {
+    const who = whoIs(c);
+    return c.json({ ...who, can: { tools: atLeast(who.role, "member"), approve: atLeast(who.role, "admin"), manageUsers: atLeast(who.role, "admin") } });
+  });
+  app.get("/api/users", (c) => {
+    if (!atLeast(whoIs(c).role, "admin")) return c.json({ error: "Only an admin can see users" }, 403);
+    return c.json({ users: userView(), keyboardRole: users.keyboardRole(), roles: ROLES.filter((r) => r !== "owner") });
+  });
+  const userChange = async (c: Context, fn: (role: Role, body: Record<string, unknown>) => unknown) => {
+    const who = whoIs(c);
+    if (!atLeast(who.role, "admin")) return c.json({ error: "Only an admin can manage users" }, 403);
+    if (!pinOk(c)) return c.json({ error: "Enter your PIN to manage users" }, 401);
+    try {
+      const out = fn(who.role, ((await c.req.json().catch(() => null)) ?? {}) as Record<string, unknown>);
+      return c.json({ ...(out && typeof out === "object" ? { user: out } : {}), users: userView(), keyboardRole: users.keyboardRole() });
+    } catch (e) {
+      if (e instanceof UserError) return c.json({ error: e.message }, e.status);
+      throw e;
+    }
+  };
+  const asRole = (r: unknown) => (typeof r === "string" ? (r as Role) : undefined);
+  app.post("/api/users", (c) => userChange(c, (by, b) => users.add(by, { name: String(b.name ?? ""), role: asRole(b.role) ?? "guest" })));
+  app.patch("/api/users/:id", (c) =>
+    userChange(c, (by, b) => {
+      const id = c.req.param("id");
+      const u = users.update(by, id, { ...(typeof b.name === "string" && { name: b.name }), ...(asRole(b.role) && { role: asRole(b.role) }) });
+      sessions.revoke(id);
+      return u;
+    }),
+  );
+  app.delete("/api/users/:id", (c) =>
+    userChange(c, (by) => {
+      const id = c.req.param("id");
+      users.remove(by, id);
+      sessions.revoke(id);
+      if (voiceId?.prints().some((p) => p.userId === id)) voiceId.remove(id);
+      return null;
+    }),
+  );
+  app.put("/api/users-keyboard", (c) => userChange(c, (by, b) => users.setKeyboardRole(by, asRole(b.role) ?? ("" as Role))));
 
   /** Voice picker: installed voices and the one in use. */
   app.get("/api/voices", (c) =>
@@ -190,7 +272,7 @@ export function createApp({
     const messages = parseMessages(await c.req.json().catch(() => null));
     if (typeof messages === "string") return c.json({ error: messages }, 400);
     try {
-      return c.json(await reply(messages, c.req.raw.signal));
+      return c.json(await reply(messages, c.req.raw.signal, whoIs(c)));
     } catch (err) {
       return c.json({ error: errorMessage(err) }, 502);
     }
@@ -203,9 +285,10 @@ export function createApp({
   app.post("/api/chat/stream", async (c) => {
     const messages = parseMessages(await c.req.json().catch(() => null));
     if (typeof messages === "string") return c.json({ error: messages }, 400);
+    const who = whoIs(c);
     return streamSSE(c, async (stream) => {
       try {
-        const r = await reply(messages, c.req.raw.signal);
+        const r = await reply(messages, c.req.raw.signal, who);
         await stream.writeSSE({ event: "route", data: JSON.stringify({ model: r.model, kind: r.kind, ...(r.kind === "answer" && r.tools && { tools: r.tools }) }) });
         if (r.kind === "answer") {
           for (const piece of chunk(r.content)) await stream.writeSSE({ event: "delta", data: JSON.stringify({ text: piece }) });
@@ -235,9 +318,11 @@ export function createApp({
     const id = c.req.param("id");
     const existing = handoffs.get(id);
     if (!existing) return c.json({ error: "handoff not found" }, 404);
+    const who = whoIs(c);
+    if (!atLeast(who.role, "admin")) return c.json({ error: "Only an admin can approve handoffs" }, 403);
     const delegate = delegates[existing.target];
     if (!delegate) return c.json({ error: `${existing.target} is not configured on this server` }, 503);
-    const h = handoffs.decide(id, "approved");
+    const h = handoffs.decide(id, "approved", who.name);
     if (!h) return c.json({ error: "handoff was already decided" }, 409);
     handoffs.update(id, { status: "running" });
     void delegate
@@ -248,7 +333,9 @@ export function createApp({
   });
 
   app.post("/api/handoffs/:id/reject", (c) => {
-    const h = handoffs.decide(c.req.param("id"), "rejected");
+    const who = whoIs(c);
+    if (!atLeast(who.role, "admin")) return c.json({ error: "Only an admin can reject handoffs" }, 403);
+    const h = handoffs.decide(c.req.param("id"), "rejected", who.name);
     if (h === undefined) return c.json({ error: "handoff not found" }, 404);
     if (h === null) return c.json({ error: "handoff was already decided" }, 409);
     return c.json({ handoff: h });

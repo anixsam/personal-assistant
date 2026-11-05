@@ -68,7 +68,11 @@ export function HandoffCard({ handoff, onChange }: { handoff: Handoff; onChange:
         </span>
       </div>
       <div className="space-y-2 px-4 py-3 text-sm">
-        <p className="text-muted">{handoff.reason}</p>
+        <p className="text-muted">
+          {handoff.reason}
+          {handoff.requestedBy && <span className="text-xs"> · asked by {handoff.requestedBy}</span>}
+          {handoff.decidedBy && handoff.status !== "pending" && <span className="text-xs"> · {handoff.status === "rejected" ? "declined" : "approved"} by {handoff.decidedBy}</span>}
+        </p>
         <div className="rounded-lg border border-line bg-panel-2 p-3 whitespace-pre-wrap">{handoff.task}</div>
         {handoff.status === "pending" && (
           <div className="flex flex-wrap gap-2 pt-1">
