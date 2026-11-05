@@ -273,3 +273,44 @@ test("users and roles: per-user voices, guests chat only, only admins approve or
   assert.equal((await req("DELETE", "/api/users/owner", undefined, ownerT.session)).status, 400);
   assert.equal((await req("PATCH", `/api/users/${ria.id}`, { role: "admin" }, ownerT.session)).status, 200);
 });
+
+test("saved history: conversations, dashboard numbers and handoffs survive a restart", async () => {
+  const { FridayDb } = await import("../dist/db.js");
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  const file = path.join(mkdtempSync(path.join(tmpdir(), "fdb-")), "friday.db");
+  let db = new FridayDb(file);
+  let app = createApp({ router: answerRouter, db });
+  const put = (a, id, body) => a.request(`/api/conversations/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  assert.equal((await put(app, "c1", { title: "Todo", messages: [{ id: "m1", role: "user", content: "hi" }], updatedAt: "2026-11-05T06:00:00.000Z" })).status, 200);
+  assert.equal((await put(app, "c2", { title: "Other", messages: [], updatedAt: "2026-11-05T07:00:00.000Z" })).status, 200);
+  assert.equal((await put(app, "bad id!", { messages: [] })).status, 400);
+  assert.equal((await put(app, "c3", { messages: "nope" })).status, 400);
+  await post(app, "/api/chat", user);
+  const hApp = createApp({ router: handoffRouter, db });
+  const { handoff } = await (await post(hApp, "/api/chat", user)).json();
+  // A handoff left running when Friday stops is marked failed on the next start.
+  const { HandoffStore } = await import("../dist/handoffs.js");
+  new HandoffStore(db).update(handoff.id, { status: "running" });
+  assert.equal((await app.request("/api/conversations/c2", { method: "DELETE" })).status, 200);
+  db.close();
+
+  db = new FridayDb(file);
+  app = createApp({ router: answerRouter, db });
+  const { saved, conversations } = await (await app.request("/api/conversations")).json();
+  assert.equal(saved, true);
+  assert.deepEqual(conversations.map((c) => [c.id, c.title, c.messages.length]), [["c1", "Todo", 1]]);
+  const stats = await (await app.request("/api/stats")).json();
+  assert.equal(stats.saved, true);
+  assert.equal(stats.totals.requests, 2);
+  const h = stats.handoffs.recent.find((x) => x.id === handoff.id);
+  assert.equal(h.status, "failed");
+  assert.match(h.error, /restarted/);
+  db.close();
+
+  // Without a database, history isn't saved and the UI keeps using the browser.
+  const mem = createApp({ router: answerRouter });
+  assert.deepEqual(await (await mem.request("/api/conversations")).json(), { saved: false, conversations: [] });
+  assert.equal((await put(mem, "c1", { messages: [] })).status, 501);
+});

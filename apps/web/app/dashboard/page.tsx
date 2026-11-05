@@ -10,6 +10,7 @@ import { UsersPanel } from "@/components/dashboard/users";
 import { HandoffHistory, McpHealth, ModelTable, Panel, RecentConversations, StatTile } from "@/components/dashboard/panels";
 import { JarvisMark } from "@/components/chat/message";
 import { getStats } from "@/lib/api";
+import { authHeaders } from "@/lib/recorder";
 import { load, sortByRecent } from "@/lib/conversations";
 import { fmtAgo, fmtInt, fmtMs, fmtUsd } from "@/lib/format";
 import type { Conversation, Stats } from "@/lib/types";
@@ -33,6 +34,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setConversations(sortByRecent(load(window.localStorage)));
+    // Prefer the saved history on the server when it has one.
+    void fetch("/api/conversations", { headers: authHeaders() })
+      .then((r) => (r.ok ? (r.json() as Promise<{ saved: boolean; conversations: Conversation[] }>) : null))
+      .then((b) => b?.saved && b.conversations.length && setConversations(sortByRecent(b.conversations)))
+      .catch(() => undefined);
     void refresh();
     const t = setInterval(refresh, 10_000);
     return () => clearInterval(t);
@@ -110,7 +116,7 @@ export default function DashboardPage() {
           </Panel>
         </section>
 
-        {stats && <p className="text-center text-xs text-muted">Server up since {new Date(stats.startedAt).toLocaleString()} · numbers reset on restart until saved history is added</p>}
+        {stats && <p className="text-center text-xs text-muted">Server up since {new Date(stats.startedAt).toLocaleString()} · {stats.saved ? "history saved in data/friday.db" : "history isn't saved: numbers reset on restart"}</p>}
       </main>
     </div>
   );

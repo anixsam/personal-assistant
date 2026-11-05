@@ -1,4 +1,5 @@
 import type { Handoff, HandoffStore } from "./handoffs.js";
+import type { FridayDb } from "./db.js";
 
 export interface RequestRecord {
   at: number;
@@ -18,6 +19,8 @@ export interface McpStatus {
 export interface Stats {
   startedAt: string;
   generatedAt: string;
+  /** Whether history is saved in the database (survives restarts). */
+  saved: boolean;
   totals: { requests: number; answered: number; handedOff: number; errors: number; avgLatencyMs: number; tokens: number };
   hourly: { hour: string; nim: number; delegated: number }[];
   models: { model: string; source: "nim" | "delegated"; requests: number; tokens: number; avgLatencyMs: number | null; costUsd: number }[];
@@ -33,12 +36,25 @@ export interface Stats {
 const HOUR = 3_600_000;
 const MAX_RECORDS = 10_000;
 
-/** In-memory usage log (SQLite persistence comes later). */
+/** Usage log behind the dashboard. With a database it's saved and the last week is reloaded on start. */
 export class StatsStore {
   private readonly records: RequestRecord[] = [];
   readonly startedAt = Date.now();
 
+  constructor(private readonly db?: FridayDb) {
+    if (db) {
+      db.pruneRequests();
+      this.records.push(...db.requestsSince(Date.now() - 168 * HOUR).slice(-MAX_RECORDS));
+    }
+  }
+
+  /** True when numbers survive a restart. */
+  get saved(): boolean {
+    return !!this.db;
+  }
+
   record(r: RequestRecord): void {
+    this.db?.addRequest(r);
     this.records.push(r);
     if (this.records.length > MAX_RECORDS) this.records.splice(0, this.records.length - MAX_RECORDS);
   }
@@ -98,6 +114,7 @@ export class StatsStore {
     return {
       startedAt: new Date(this.startedAt).toISOString(),
       generatedAt: new Date(now).toISOString(),
+      saved: this.saved,
       totals: {
         requests: recent.length,
         answered: ok.filter((r) => r.kind === "answer").length,

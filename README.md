@@ -74,6 +74,15 @@ that person, and the chat header shows who Friday thinks it's talking to. Unknow
 change that to guest on the same panel. With voice ID off, everyone is the owner. Users are saved in
 `data/users.json` (gitignored).
 
+## Saved history
+
+Conversations, the dashboard numbers and handoff history are saved in a local SQLite database,
+`data/friday.db` (gitignored; set `FRIDAY_DB` to move it). It uses Node's built-in `node:sqlite`, so
+there's nothing extra to install (Node 22.13+; Node may print an "experimental" warning on start, which is
+harmless). Chats are kept per person: whoever Friday recognises by voice sees their own list. Chats that
+were only in your browser are uploaded the first time the server is reachable. Handoffs that were
+running when Friday stopped show as failed after a restart.
+
 ## Tools (MCP servers)
 
 Friday can use three optional MCP servers. Each one starts only when you configure it in `.env`, so

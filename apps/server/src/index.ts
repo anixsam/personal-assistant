@@ -6,6 +6,7 @@ import { serve } from "@hono/node-server";
 import { JarvisRouter, NimClient, loadNimConfig } from "@jarvis/router";
 import { DEFAULT_VOICEID_MODEL, OnnxSpeakerEmbedder, VoiceprintStore } from "@jarvis/voiceid";
 import { OWNER_ID, UserStore } from "./users.js";
+import { FridayDb } from "./db.js";
 import { createApp } from "./app.js";
 import { ClaudeDelegate } from "./delegates/claude.js";
 import { ClaudeCodeDelegate } from "./delegates/claude-code.js";
@@ -81,13 +82,16 @@ if (!voiceId.available()) console.warn("Voice ID not set up: run `pnpm voice:set
 // Users and roles (data/users.json). The owner is created on first run, named after the enrolled voice if any.
 const users = new UserStore(env.USERS_STORE || resolve(repoRoot, "data", "users.json"), voiceId.prints().find((p) => p.userId === OWNER_ID)?.name || env.FRIDAY_OWNER_NAME || "Owner");
 
+// Saved history: conversations, dashboard numbers and handoffs in data/friday.db (FRIDAY_DB to move it).
+const db = new FridayDb(env.FRIDAY_DB || resolve(repoRoot, "data", "friday.db"));
+
 const port = Number(env.PORT) || 8787;
-const app = createApp({ router, delegates, voice, stt, voiceId, users, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
+const app = createApp({ router, db, delegates, voice, stt, voiceId, users, mcpStatus: () => hub.status(), corsOrigin: env.CORS_ORIGIN || "http://localhost:3000" });
 
 serve({ fetch: app.fetch, port, hostname: env.HOST || "127.0.0.1" }, (info) => {
   console.log(`Friday server listening on http://${info.address}:${info.port}`);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
-  process.once(sig, () => void hub.close().finally(() => process.exit(0)));
+  process.once(sig, () => void hub.close().finally(() => (db.close(), process.exit(0))));
 }

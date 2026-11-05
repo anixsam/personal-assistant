@@ -47,6 +47,7 @@ export interface Conversation {
 export interface Stats {
   startedAt: string;
   generatedAt: string;
+  saved?: boolean;
   totals: { requests: number; answered: number; handedOff: number; errors: number; avgLatencyMs: number; tokens: number };
   hourly: { hour: string; nim: number; delegated: number }[];
   models: { model: string; source: "nim" | "delegated"; requests: number; tokens: number; avgLatencyMs: number | null; costUsd: number }[];

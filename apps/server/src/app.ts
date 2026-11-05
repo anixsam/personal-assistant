@@ -8,6 +8,7 @@ import { StatsStore, defaultMcpStatus, type McpStatus } from "./stats.js";
 import { speakable } from "@jarvis/voice";
 import { checkPin, type VoiceprintStore } from "@jarvis/voiceid";
 import { checkSpeaker, registerVoiceIdRoutes } from "./voiceid.js";
+import { MAX_CONVERSATION_BYTES, type FridayDb } from "./db.js";
 import { ROLES, SESSION_HEADER, Sessions, UserError, UserStore, atLeast, type Identity, type Role } from "./users.js";
 
 /** Text-to-speech used for spoken replies (Piper in production, a fake in tests). */
@@ -36,6 +37,8 @@ export interface ChatRouter {
 
 export interface AppDeps {
   router: ChatRouter;
+  /** SQLite database: saves conversations, dashboard numbers and handoffs. Without it they live in memory. */
+  db?: FridayDb;
   handoffs?: HandoffStore;
   /** Executors for approved handoffs. A missing target makes approval fail with 503. */
   delegates?: Delegates;
@@ -79,9 +82,10 @@ export function parseMessages(body: unknown): NimMessage[] | string {
 
 export function createApp({
   router,
-  handoffs = new HandoffStore(),
+  db,
+  handoffs = new HandoffStore(db),
   delegates = {},
-  stats = new StatsStore(),
+  stats = new StatsStore(db),
   voice,
   stt,
   voiceId,
@@ -239,6 +243,7 @@ export function createApp({
       const id = c.req.param("id");
       users.remove(by, id);
       sessions.revoke(id);
+      db?.deleteConversationsOf(id);
       if (voiceId?.prints().some((p) => p.userId === id)) voiceId.remove(id);
       return null;
     }),
@@ -259,6 +264,31 @@ export function createApp({
       return c.json({ error: errorMessage(err) }, 404);
     }
     return c.json({ current: voice.current?.() ?? body.voice });
+  });
+
+  // Saved conversations, kept per person (whoever Friday recognises, or the keyboard role).
+  app.get("/api/conversations", (c) => c.json({ saved: !!db, conversations: db?.listConversations(whoIs(c).userId) ?? [] }));
+  app.put("/api/conversations/:id", async (c) => {
+    if (!db) return c.json({ error: "History isn't saved on this server" }, 501);
+    const raw = await c.req.text();
+    if (raw.length > MAX_CONVERSATION_BYTES) return c.json({ error: "Conversation is too large to save" }, 413);
+    let b: { title?: unknown; messages?: unknown; updatedAt?: unknown };
+    try {
+      b = JSON.parse(raw) as typeof b;
+    } catch {
+      return c.json({ error: "Send JSON" }, 400);
+    }
+    const id = c.req.param("id");
+    if (!/^[\w-]{1,64}$/.test(id)) return c.json({ error: "bad id" }, 400);
+    if (!Array.isArray(b.messages)) return c.json({ error: "messages must be an array" }, 400);
+    const updatedAt = typeof b.updatedAt === "string" && !Number.isNaN(Date.parse(b.updatedAt)) ? b.updatedAt : new Date().toISOString();
+    const title = typeof b.title === "string" && b.title.trim() ? b.title.trim().slice(0, 120) : "New conversation";
+    db.putConversation(whoIs(c).userId, { id, title, messages: b.messages, updatedAt });
+    return c.json({ ok: true });
+  });
+  app.delete("/api/conversations/:id", (c) => {
+    if (!db) return c.json({ error: "History isn't saved on this server" }, 501);
+    return c.json({ ok: db.deleteConversation(whoIs(c).userId, c.req.param("id")) });
   });
 
   /** Dashboard numbers: usage per model, hourly traffic, handoff history, MCP health. */

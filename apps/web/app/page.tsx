@@ -32,7 +32,8 @@ const HANDOFF_LINE = {
 } as const;
 
 export default function ChatPage() {
-  const { list, active, activeId, setActiveId, update, create, remove } = useConversations();
+  const [me, setMe] = useState<Me | null>(null);
+  const { list, active, activeId, setActiveId, update, create, remove } = useConversations(me?.userId);
   const voice = useVoice();
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState<boolean | null>(null);
@@ -46,7 +47,6 @@ export default function ChatPage() {
   useEffect(() => setHello(greeting()), []);
 
   // Who Friday thinks it's talking to (voice session, PIN unlock, or the keyboard role).
-  const [me, setMe] = useState<Me | null>(null);
   useEffect(() => {
     const refresh = async () => setMe(await getMe());
     void refresh();

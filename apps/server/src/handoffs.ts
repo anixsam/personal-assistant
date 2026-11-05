@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DelegateTarget } from "@jarvis/router";
+import type { FridayDb } from "./db.js";
 
 export type HandoffStatus = "pending" | "approved" | "rejected" | "running" | "completed" | "failed";
 
@@ -29,14 +30,29 @@ export const HANDOFF_STATUSES: readonly HandoffStatus[] = ["pending", "approved"
 
 /**
  * Handoffs NIM has proposed. Nothing is sent to Claude or Claude Code until a handoff is approved.
- * In-memory for now; SQLite persistence comes later.
+ * Saved in the database when one is given; handoffs that were running when Friday stopped are marked failed.
  */
 export class HandoffStore {
   private readonly items = new Map<string, Handoff>();
 
+  constructor(private readonly db?: FridayDb) {
+    for (const h of db?.loadHandoffs() ?? []) {
+      if (h.status === "running" || h.status === "approved") {
+        Object.assign(h, { status: "failed", error: "Friday restarted before this finished", finishedAt: new Date().toISOString() });
+        db!.saveHandoff(h);
+      }
+      this.items.set(h.id, h);
+    }
+  }
+
+  private persist(h: Handoff) {
+    this.db?.saveHandoff(h);
+  }
+
   create(input: Pick<Handoff, "target" | "task" | "reason" | "requestedBy">): Handoff {
     const h: Handoff = { id: randomUUID(), ...input, status: "pending", createdAt: new Date().toISOString() };
     this.items.set(h.id, h);
+    this.persist(h);
     return h;
   }
 
@@ -56,12 +72,16 @@ export class HandoffStore {
     h.status = status;
     h.decidedAt = new Date().toISOString();
     if (by) h.decidedBy = by;
+    this.persist(h);
     return h;
   }
 
   update(id: string, patch: Partial<Omit<Handoff, "id">>): Handoff | undefined {
     const h = this.items.get(id);
-    if (h) Object.assign(h, patch);
+    if (h) {
+      Object.assign(h, patch);
+      this.persist(h);
+    }
     return h;
   }
 }
