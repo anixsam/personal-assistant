@@ -4,14 +4,20 @@
   "version": "0.0.0",
   "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "pnpm --filter \"./packages/**\" --filter \"./mcp/**\" build && pnpm --parallel --filter @jarvis/server --filter @jarvis/web dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "voice:setup": "node scripts/voice-setup.mjs"
+    "check": "pnpm typecheck && pnpm build && pnpm test",
+    "voice:setup": "node scripts/voice-setup.mjs",
+    "bootstrap": "pnpm install && pnpm build && node scripts/voice-setup.mjs --stt --voiceid && node scripts/preflight.mjs",
+    "preflight": "node scripts/preflight.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

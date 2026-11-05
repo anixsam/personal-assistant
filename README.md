@@ -1,5 +1,7 @@
 # Friday
 
+[![CI](https://github.com/anixsam/personal-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/anixsam/personal-assistant/actions/workflows/ci.yml)
+
 > Formerly Jarvis. Internal package names (`@jarvis/*`) and `JARVIS_*` environment variables keep the old name so existing setups keep working.
 
 A personal assistant with a modern chat UI, dashboards, voice replies and Claude Code as its
@@ -14,22 +16,32 @@ to Claude or Claude Code only after you approve.
 | `apps/server` | API server: chat, tool loop, voice synthesis |
 | `packages/router` | NVIDIA NIM router: answers first, delegates on approval |
 | `packages/shared` | Shared types |
-| `packages/voice` | Piper text-to-speech wrapper |
+| `packages/voice` | Piper text-to-speech, whisper.cpp / NIM speech-to-text |
+| `packages/voiceid` | Voice identification (local speaker embeddings) |
 | `mcp/filesystem` | MCP server: workspace files |
 | `mcp/github` | MCP server: GitHub repos, issues, PRs |
 | `mcp/claude-code` | MCP server: delegates coding tasks to Claude Code |
+| `scripts` | Voice downloads (`voice-setup.mjs`) and the setup check (`preflight.mjs`) |
+| `docs/SETUP.md` | Full setup guide and troubleshooting |
 
 ## Getting started
 
 ```bash
-pnpm install
+pnpm bootstrap         # install, build, download voices, speech and voice ID models, then check
 cp .env.example .env   # add NVIDIA_API_KEY (and optionally ANTHROPIC_API_KEY, CLAUDE_CODE_CWD)
-pnpm -r build
-pnpm voice:setup       # optional: downloads Piper + the British voice into ./voices
+pnpm preflight         # what's set up and what's missing (never prints your keys)
 pnpm dev               # server on :8787, chat UI on http://localhost:3000
 ```
 
-Needs Node 22+ and pnpm 10 (`npm i -g pnpm@10.28.0`; on Windows, pnpm 11+ can fail to switch to the pinned version).
+Needs Node 22.13+ (Node 24 recommended) and pnpm 10 (`npm i -g pnpm@10.28.0`; on Windows, pnpm 11+ can
+fail to switch to the pinned version). The full walkthrough, every setting, and troubleshooting are in
+[docs/SETUP.md](docs/SETUP.md).
+
+## Development
+
+`pnpm check` runs what CI runs: typecheck, build and every test. GitHub Actions runs it on every push and
+pull request, on Node 22 and 24 ([.github/workflows/ci.yml](.github/workflows/ci.yml)). Tests use fakes for
+NIM, Piper, whisper.cpp and Claude Code, so they need no keys or downloads.
 
 ## Talking to Friday
 

@@ -7,3 +7,4 @@ dist/
 *.onnx
 voices/
 data/
+apps/web/AGENTS.md
