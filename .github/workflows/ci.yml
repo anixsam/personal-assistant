@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   check:
-    name: Typecheck, build and test (Node ${{ matrix.node }})
+    name: Build, typecheck and test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,6 +25,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      # Build first: packages typecheck against each other's built types (dist/).
       - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm test

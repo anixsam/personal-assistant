@@ -39,7 +39,7 @@ fail to switch to the pinned version). The full walkthrough, every setting, and 
 
 ## Development
 
-`pnpm check` runs what CI runs: typecheck, build and every test. GitHub Actions runs it on every push and
+`pnpm check` runs what CI runs: build, typecheck and every test. GitHub Actions runs it on every push and
 pull request, on Node 22 and 24 ([.github/workflows/ci.yml](.github/workflows/ci.yml)). Tests use fakes for
 NIM, Piper, whisper.cpp and Claude Code, so they need no keys or downloads.
 

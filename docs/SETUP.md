@@ -71,7 +71,7 @@ Open http://localhost:3000.
 | --- | --- |
 | `pnpm dev` | Run Friday (server + UI) |
 | `pnpm preflight` | Check the setup |
-| `pnpm check` | Typecheck, build and run every test (the same as CI) |
+| `pnpm check` | Build, typecheck and run every test (the same as CI) |
 | `pnpm voice:setup <voice>` | Add another stock Piper voice, such as `en_GB-cori-high` |
 | `git pull && pnpm install && pnpm dev` | Update to the latest version |
 
