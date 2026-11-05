@@ -27,6 +27,26 @@ const archives = {
   "darwin-arm64": "piper_macos_aarch64.tar.gz",
 };
 
+/**
+ * The newest whisper.cpp release that ships a plain Windows x64 build. The newest release doesn't always
+ * have binaries, so /releases/latest/download/... can 404; this looks through recent releases instead.
+ */
+async function whisperWindowsZip() {
+  const fallback = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.7.6/whisper-bin-x64.zip";
+  try {
+    const res = await fetch("https://api.github.com/repos/ggml-org/whisper.cpp/releases?per_page=15", { headers: { Accept: "application/vnd.github+json", "User-Agent": "friday-voice-setup" } });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    for (const rel of await res.json()) {
+      const assets = (rel.assets ?? []).filter((a) => /x64\.zip$/i.test(a.name) && /whisper/i.test(a.name) && !/cublas|cuda|vulkan|openvino|xcframework/i.test(a.name));
+      const pick = assets.find((a) => a.name === "whisper-bin-x64.zip") ?? assets.find((a) => !/blas/i.test(a.name)) ?? assets[0];
+      if (pick) return pick.browser_download_url;
+    }
+  } catch (e) {
+    console.log(`  couldn't list whisper.cpp releases (${e.message}), trying ${fallback}`);
+  }
+  return fallback;
+}
+
 async function download(url, dest) {
   if (existsSync(dest) && statSync(dest).size > 0) return console.log(`  already have ${path.basename(dest)}`);
   console.log(`  downloading ${url}`);
@@ -79,7 +99,7 @@ if (wantStt) {
   } else if (key === "win32-x64") {
     mkdirSync(wdir, { recursive: true });
     const zip = path.join(wdir, "whisper-bin-x64.zip");
-    await download("https://github.com/ggml-org/whisper.cpp/releases/latest/download/whisper-bin-x64.zip", zip);
+    await download(await whisperWindowsZip(), zip);
     execFileSync("tar", ["-xf", zip, "-C", wdir], { stdio: "inherit" });
     rmSync(zip, { force: true });
   } else {
